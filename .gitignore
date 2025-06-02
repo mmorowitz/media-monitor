@@ -3,3 +3,6 @@ __pycache__/
 .env
 data/
 logs/
+venv/
+.vscode/*
+!.vscode/launch.json
