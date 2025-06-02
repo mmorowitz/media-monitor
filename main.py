@@ -1,20 +1,27 @@
 import os
 import logging
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
 
+def load_config(filename='config.yaml'):
+    with open(filename, 'r') as file:
+        return yaml.safe_load(file)
+
 def main():
     logging.info("Starting the application...")
-    
-    # load config
-    smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port = os.getenv('SMTP_PORT')
-    smtp_user = os.getenv('SMTP_USER')
-    smtp_password = os.getenv('SMTP_PASSWORD')
+    config = load_config()
+    #TODO should i merge config and env variables?
+    logging.info("Loaded configuration")
 
     # initialize database
+
     # execute main logic
+    if config.get("reddit", {}).get("enabled"):
+        logging.info("Reddit integration is enabled.")
+        # Initialize Reddit client and perform actions
+
 
 if __name__ == "__main__":
     logging.basicConfig(filename='logs/app.log', level=logging.INFO)
