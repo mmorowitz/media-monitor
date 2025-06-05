@@ -2,6 +2,7 @@ import os
 import logging
 import yaml
 from dotenv import load_dotenv
+from db import init_db, get_last_checked, update_last_checked
 
 load_dotenv()
 
@@ -16,11 +17,15 @@ def main():
     logging.info("Loaded configuration")
 
     # initialize database
-
+    db_conn = init_db()
+    logging.info("Database initialized")
+    
     # execute main logic
     if config.get("reddit", {}).get("enabled"):
         logging.info("Reddit integration is enabled.")
         # Initialize Reddit client and perform actions
+        
+
 
 
 if __name__ == "__main__":
