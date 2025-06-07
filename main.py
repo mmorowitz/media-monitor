@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from db import init_db, get_last_checked, update_last_checked
 from reddit_client import RedditClient
 
+logging.basicConfig(filename='logs/app.log', level=logging.INFO)
+
 load_dotenv()
 
 def load_config(filename='config.yaml'):
@@ -42,6 +44,5 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='logs/app.log', level=logging.INFO)
     main()
     logging.info("Application finished successfully.")
