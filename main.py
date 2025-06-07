@@ -1,8 +1,10 @@
 import os
 import logging
 import yaml
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from db import init_db, get_last_checked, update_last_checked
+from reddit_client import RedditClient
 
 load_dotenv()
 
@@ -23,9 +25,20 @@ def main():
     # execute main logic
     if config.get("reddit", {}).get("enabled"):
         logging.info("Reddit integration is enabled.")
-        # Initialize Reddit client and perform actions
-        
 
+        # Initialize Reddit client and perform actions
+        reddit_client = RedditClient(config["reddit"])
+        last_checked = get_last_checked(db_conn, "reddit")
+        if not last_checked:
+            last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
+            logging.info("No previous check found, using last 72 hours as initial window.")
+        logging.info(f"Last checked time for Reddit: {last_checked}")
+        
+        new_posts = reddit_client.get_new_posts_since(last_checked)
+        logging.info(f"Found {len(new_posts)} new Reddit posts since last checked.")
+        
+        for post in new_posts:
+            logging.info(f"New post: {post['title']} (ID: {post['id']})")
 
 
 if __name__ == "__main__":
