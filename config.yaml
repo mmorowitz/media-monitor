@@ -1,7 +1,0 @@
-reddit:
-  enabled: true
-  subreddits:
-    - chicago  
-  client_id: LA3bPvcz7IEJKqyYFqJRwA
-  client_secret: k0aaHoWO8st-_uj1Yr625tuAH2T9UA
-  user_agent: media-monitor-bot/0.1 by /u/mmchicago
