@@ -40,7 +40,9 @@ def main():
         logging.info(f"Found {len(new_posts)} new Reddit posts since last checked.")
         
         for post in new_posts:
-            logging.info(f"New post: {post['title']} (ID: {post['id']})")
+            logging.debug(f"New post: {post['title']} (ID: {post['id']})")
+
+    db_conn.close()
 
 
 if __name__ == "__main__":
