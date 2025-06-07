@@ -31,7 +31,12 @@ def main():
         # Initialize Reddit client and perform actions
         reddit_client = RedditClient(config["reddit"])
         last_checked = get_last_checked(db_conn, "reddit")
-        if not last_checked:
+        if last_checked:
+            # Convert from string to datetime
+            last_checked = datetime.fromisoformat(last_checked)
+            if last_checked.tzinfo is None:
+                last_checked = last_checked.replace(tzinfo=timezone.utc)
+        else:
             last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
             logging.info("No previous check found, using last 72 hours as initial window.")
         logging.info(f"Last checked time for Reddit: {last_checked}")
@@ -42,6 +47,8 @@ def main():
         for post in new_posts:
             logging.debug(f"New post: {post['title']} (ID: {post['id']})")
 
+        update_last_checked(db_conn, "reddit", datetime.now(timezone.utc)) 
+        logging.info("Updated last checked time for Reddit in the database.")
     db_conn.close()
 
 

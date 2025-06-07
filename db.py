@@ -1,7 +1,7 @@
 import sqlite3
 
 def init_db():
-    conn = sqlite3.connect('media_monitor.db')
+    conn = sqlite3.connect('data/media_monitor.db')
     cursor = conn.cursor()
 
     cursor.execute('''
