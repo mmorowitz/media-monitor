@@ -54,8 +54,24 @@ def main():
     if config.get("youtube", {}).get("enabled"):
         logging.info("YouTube integration is enabled.")
         # Initialize YouTube client and perform actions
-
-
+        youtube_client = YouTubeClient(config["youtube"])
+        last_checked = get_last_checked(db_conn, "youtube")
+        if last_checked:
+            # Convert from string to datetime
+            last_checked = datetime.fromisoformat(last_checked)
+            if last_checked.tzinfo is None:
+                last_checked = last_checked.replace(tzinfo=timezone.utc)
+        else:
+            last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
+            logging.info("No previous check found, using last 72 hours as initial window.")
+        logging.info(f"Last checked time for YouTube: {last_checked}")
+        new_videos = youtube_client.get_new_videos_since(last_checked)
+        logging.info(f"Found {len(new_videos)} new YouTube videos since last checked.")
+        for video in new_videos:
+            logging.debug(f"New video: {video['title']} (ID: {video['id']})")
+        update_last_checked(db_conn, "youtube", datetime.now(timezone.utc))
+        logging.info("Updated last checked time for YouTube in the database.")
+        
     db_conn.close()
 
 
