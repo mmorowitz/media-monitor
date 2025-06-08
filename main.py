@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from db import init_db, get_last_checked, update_last_checked
 from reddit_client import RedditClient
+from youtube_client import YouTubeClient
 
 logging.basicConfig(filename='logs/app.log', level=logging.INFO)
 
@@ -49,6 +50,12 @@ def main():
 
         update_last_checked(db_conn, "reddit", datetime.now(timezone.utc)) 
         logging.info("Updated last checked time for Reddit in the database.")
+
+    if config.get("youtube", {}).get("enabled"):
+        logging.info("YouTube integration is enabled.")
+        # Initialize YouTube client and perform actions
+
+
     db_conn.close()
 
 

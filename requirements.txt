@@ -1,3 +1,4 @@
 praw
 python-dotenv
-PyYAML
+pyyaml
+google-api-python-client

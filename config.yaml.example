@@ -1,6 +1,27 @@
 reddit:
   enabled: true
   subreddits:
+    - SUBREDDIT
+    - ANOTHER_SUBREDDIT
   client_id: YOUR_CLIENT_ID
   client_secret: YOUR_CLIENT_SECRET
   user_agent: YOUR_USER_AGENT
+
+youtube:
+  enabled: true
+  api_key: YOUR_API_KEY
+  channels:
+    - UC_x5XG1OV2P6uZZ5FSM9Ttw
+    - ANOTHER_CHANNEL_ID
+
+smtp:
+  enabled: false
+  server: smtp.example.com
+  port: 587
+  username: your@email.com
+  password: yourpassword
+  from: your@email.com
+  to:
+    - recipient1@example.com
+    - recipient2@example.com
+  subject: Media Monitor Report
