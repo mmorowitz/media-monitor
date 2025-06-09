@@ -15,63 +15,41 @@ def load_config(filename='config.yaml'):
     with open(filename, 'r') as file:
         return yaml.safe_load(file)
 
+def process_source(source_name, client_class, config, db_conn):
+    if config.get(source_name, {}).get("enabled"):
+        logging.info(f"{source_name.capitalize()} integration is enabled.")
+        client = client_class(config[source_name])
+        last_checked = get_last_checked(db_conn, source_name)
+        if last_checked:
+            last_checked = datetime.fromisoformat(last_checked)
+            if last_checked.tzinfo is None:
+                last_checked = last_checked.replace(tzinfo=timezone.utc)
+        else:
+            last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
+            logging.info(f"No previous check found, using last 72 hours as initial window for {source_name}.")
+        logging.info(f"Last checked time for {source_name.capitalize()}: {last_checked}")
+
+        new_items = client.get_new_items_since(last_checked)
+        item_type = f"{source_name.capitalize()} items"
+
+        logging.info(f"Found {len(new_items)} new {item_type} since last checked.")
+        for item in new_items:
+            logging.debug(f"New {source_name} item: {item['title']} (ID: {item['id']})")
+
+        update_last_checked(db_conn, source_name, datetime.now(timezone.utc))
+        logging.info(f"Updated last checked time for {source_name.capitalize()} in the database.")
+
 def main():
     logging.info("Starting the application...")
     config = load_config()
-    #TODO should i merge config and env variables?
     logging.info("Loaded configuration")
 
-    # initialize database
     db_conn = init_db()
     logging.info("Database initialized")
-    
-    # execute main logic
-    if config.get("reddit", {}).get("enabled"):
-        logging.info("Reddit integration is enabled.")
 
-        # Initialize Reddit client and perform actions
-        reddit_client = RedditClient(config["reddit"])
-        last_checked = get_last_checked(db_conn, "reddit")
-        if last_checked:
-            # Convert from string to datetime
-            last_checked = datetime.fromisoformat(last_checked)
-            if last_checked.tzinfo is None:
-                last_checked = last_checked.replace(tzinfo=timezone.utc)
-        else:
-            last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
-            logging.info("No previous check found, using last 72 hours as initial window.")
-        logging.info(f"Last checked time for Reddit: {last_checked}")
-        
-        new_posts = reddit_client.get_new_posts_since(last_checked)
-        logging.info(f"Found {len(new_posts)} new Reddit posts since last checked.")
-        
-        for post in new_posts:
-            logging.debug(f"New post: {post['title']} (ID: {post['id']})")
+    process_source("reddit", RedditClient, config, db_conn)
+    process_source("youtube", YouTubeClient, config, db_conn)
 
-        update_last_checked(db_conn, "reddit", datetime.now(timezone.utc)) 
-        logging.info("Updated last checked time for Reddit in the database.")
-
-    if config.get("youtube", {}).get("enabled"):
-        logging.info("YouTube integration is enabled.")
-        # Initialize YouTube client and perform actions
-        youtube_client = YouTubeClient(config["youtube"])
-        last_checked = get_last_checked(db_conn, "youtube")
-        if last_checked:
-            # Convert from string to datetime
-            last_checked = datetime.fromisoformat(last_checked)
-            if last_checked.tzinfo is None:
-                last_checked = last_checked.replace(tzinfo=timezone.utc)
-        else:
-            last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
-            logging.info("No previous check found, using last 72 hours as initial window.")
-        logging.info(f"Last checked time for YouTube: {last_checked}")
-        new_videos = youtube_client.get_new_videos_since(last_checked)
-        logging.info(f"Found {len(new_videos)} new YouTube videos since last checked.")
-        for video in new_videos:
-            logging.debug(f"New video: {video['title']} (ID: {video['id']})")
-        update_last_checked(db_conn, "youtube", datetime.now(timezone.utc))
-        logging.info("Updated last checked time for YouTube in the database.")
-        
     db_conn.close()
 
 

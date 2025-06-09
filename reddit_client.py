@@ -19,7 +19,7 @@ class RedditClient:
         )
         self.subreddits = config["subreddits"]
 
-    def get_new_posts_since(self, since_datetime):
+    def get_new_items_since(self, since_datetime):
         """
         Retrieve new posts from configured subreddits since the given datetime.
         Returns a list of dicts with post info.

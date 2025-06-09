@@ -14,7 +14,7 @@ class YouTubeClient:
         self.channels = config["channels"]
         self.youtube = build("youtube", "v3", developerKey=self.api_key)
 
-    def get_new_videos_since(self, since_datetime):
+    def get_new_items_since(self, since_datetime):
         """
         Retrieve new videos from configured channels since the given datetime.
         Returns a list of dicts with video info.
