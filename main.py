@@ -1,5 +1,6 @@
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 import yaml
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -9,10 +10,15 @@ from youtube_client import YouTubeClient
 import smtplib
 from email.message import EmailMessage
 
+log_handler = RotatingFileHandler(
+    'logs/app.log', maxBytes=5*1024*1024, backupCount=5  # 5 MB per file, keep 5 backups
+)
+log_handler.setLevel(logging.INFO)
+log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s:%(message)s'))
+
 logging.basicConfig(
-    filename='logs/app.log',
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s:%(message)s'
+    handlers=[log_handler],
+    level=logging.INFO
 )
 
 load_dotenv()
