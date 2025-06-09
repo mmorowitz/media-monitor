@@ -3,7 +3,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 import yaml
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
 from db import init_db, get_last_checked, update_last_checked
 from reddit_client import RedditClient
 from youtube_client import YouTubeClient
@@ -20,8 +19,6 @@ logging.basicConfig(
     handlers=[log_handler],
     level=logging.INFO
 )
-
-load_dotenv()
 
 def load_config(filename='config.yaml'):
     with open(filename, 'r') as file:
