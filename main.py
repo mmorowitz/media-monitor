@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from db import init_db, get_last_checked, update_last_checked
 from reddit_client import RedditClient
 from youtube_client import YouTubeClient
+import smtplib
+from email.message import EmailMessage
 
 logging.basicConfig(filename='logs/app.log', level=logging.INFO)
 
@@ -39,6 +41,28 @@ def process_source(source_name, client_class, config, db_conn):
         update_last_checked(db_conn, source_name, datetime.now(timezone.utc))
         logging.info(f"Updated last checked time for {source_name.capitalize()} in the database.")
 
+def load_smtp_settings(config):
+    smtp_cfg = config.get("smtp", {})
+    if not smtp_cfg.get("enabled", False):
+        logging.info("SMTP is not enabled in config.")
+        return None
+    return smtp_cfg
+
+def send_test_email(smtp_cfg):
+    msg = EmailMessage()
+    msg["Subject"] = "Media Monitor Test Email"
+    msg["From"] = smtp_cfg["from"]
+    msg["To"] = ", ".join(smtp_cfg["to"])
+    msg.set_content("This is a test email from your Media Monitor script.")
+
+    try:
+        with smtplib.SMTP_SSL(smtp_cfg["server"], smtp_cfg["port"]) as server:
+            server.login(smtp_cfg["username"], smtp_cfg["password"])
+            server.send_message(msg)
+        logging.info("Test email sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send test email: {e}")
+
 def main():
     logging.info("Starting the application...")
     config = load_config()
@@ -52,6 +76,9 @@ def main():
 
     db_conn.close()
 
+    smtp_cfg = load_smtp_settings(config)
+    if smtp_cfg:
+        send_test_email(smtp_cfg)
 
 if __name__ == "__main__":
     main()
