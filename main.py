@@ -9,7 +9,11 @@ from youtube_client import YouTubeClient
 import smtplib
 from email.message import EmailMessage
 
-logging.basicConfig(filename='logs/app.log', level=logging.INFO)
+logging.basicConfig(
+    filename='logs/app.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s:%(message)s'
+)
 
 load_dotenv()
 
