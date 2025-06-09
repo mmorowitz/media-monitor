@@ -3,9 +3,9 @@ import logging
 from logging.handlers import RotatingFileHandler
 import yaml
 from datetime import datetime, timedelta, timezone
-from db import init_db, get_last_checked, update_last_checked
-from reddit_client import RedditClient
-from youtube_client import YouTubeClient
+from src.db import init_db, get_last_checked, update_last_checked
+from src.reddit_client import RedditClient
+from src.youtube_client import YouTubeClient
 import smtplib
 from email.message import EmailMessage
 
@@ -20,7 +20,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-def load_config(filename='config.yaml'):
+def load_config(filename='config/config.yaml'):
     with open(filename, 'r') as file:
         return yaml.safe_load(file)
 
