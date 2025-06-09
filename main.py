@@ -22,6 +22,7 @@ def load_config(filename='config.yaml'):
         return yaml.safe_load(file)
 
 def process_source(source_name, client_class, config, db_conn):
+    items = []
     if config.get(source_name, {}).get("enabled"):
         logging.info(f"{source_name.capitalize()} integration is enabled.")
         client = client_class(config[source_name])
@@ -44,6 +45,8 @@ def process_source(source_name, client_class, config, db_conn):
 
         update_last_checked(db_conn, source_name, datetime.now(timezone.utc))
         logging.info(f"Updated last checked time for {source_name.capitalize()} in the database.")
+        items = new_items
+    return items
 
 def load_smtp_settings(config):
     smtp_cfg = config.get("smtp", {})
@@ -67,6 +70,35 @@ def send_test_email(smtp_cfg):
     except Exception as e:
         logging.error(f"Failed to send test email: {e}")
 
+def send_email(smtp_cfg, all_items):
+    msg = EmailMessage()
+    msg["Subject"] = "Media Monitor Report"
+    msg["From"] = smtp_cfg["from"]
+    msg["To"] = ", ".join(smtp_cfg["to"])
+
+    if not all_items:
+        body = "No new items found from any source."
+    else:
+        body = "New items found:\n\n"
+        for source, items in all_items.items():
+            body += f"{source.capitalize()}:\n"
+            if items:
+                for item in items:
+                    body += f"- {item.get('title', 'No Title')} (ID: {item.get('id', 'N/A')})\n"
+            else:
+                body += "No new items.\n"
+            body += "\n"
+
+    msg.set_content(body)
+
+    try:
+        with smtplib.SMTP_SSL(smtp_cfg["server"], smtp_cfg["port"]) as server:
+            server.login(smtp_cfg["username"], smtp_cfg["password"])
+            server.send_message(msg)
+        logging.info("Email sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send email: {e}")
+
 def main():
     logging.info("Starting the application...")
     config = load_config()
@@ -75,14 +107,15 @@ def main():
     db_conn = init_db()
     logging.info("Database initialized")
 
-    process_source("reddit", RedditClient, config, db_conn)
-    process_source("youtube", YouTubeClient, config, db_conn)
+    all_items = {}
+    all_items["reddit"] = process_source("reddit", RedditClient, config, db_conn)
+    all_items["youtube"] = process_source("youtube", YouTubeClient, config, db_conn)
 
     db_conn.close()
 
     smtp_cfg = load_smtp_settings(config)
     if smtp_cfg:
-        send_test_email(smtp_cfg)
+        send_email(smtp_cfg, all_items)
 
 if __name__ == "__main__":
     main()
