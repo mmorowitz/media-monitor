@@ -81,18 +81,27 @@ def send_email(smtp_cfg, all_items):
 
     if not all_items:
         body = "No new items found from any source."
+        html_body = "<p>No new items found from any source.</p>"
     else:
         body = "New items found:\n\n"
+        html_body = "<h2>New items found:</h2>"
         for source, items in all_items.items():
             body += f"{source.capitalize()}:\n"
+            html_body += f"<h3>{source.capitalize()}:</h3><ul>"
             if items:
                 for item in items:
-                    body += f"- {item.get('title', 'No Title')} (ID: {item.get('id', 'N/A')})\n"
+                    title = item.get('title', 'No Title')
+                    url = item.get('url', '#')
+                    body += f"- {title} (ID: {item.get('id', 'N/A')})\n"
+                    html_body += f'<li><a href="{url}">{title}</a> (ID: {item.get("id", "N/A")})</li>'
             else:
                 body += "No new items.\n"
+                html_body += "<li>No new items.</li>"
             body += "\n"
+            html_body += "</ul>"
 
     msg.set_content(body)
+    msg.add_alternative(html_body, subtype='html')
 
     try:
         with smtplib.SMTP_SSL(smtp_cfg["server"], smtp_cfg["port"]) as server:
