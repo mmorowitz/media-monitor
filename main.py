@@ -58,21 +58,6 @@ def load_smtp_settings(config):
         return None
     return smtp_cfg
 
-def send_test_email(smtp_cfg):
-    msg = EmailMessage()
-    msg["Subject"] = "Media Monitor Test Email"
-    msg["From"] = smtp_cfg["from"]
-    msg["To"] = ", ".join(smtp_cfg["to"])
-    msg.set_content("This is a test email from your Media Monitor script.")
-
-    try:
-        with smtplib.SMTP_SSL(smtp_cfg["server"], smtp_cfg["port"]) as server:
-            server.login(smtp_cfg["username"], smtp_cfg["password"])
-            server.send_message(msg)
-        logging.info("Test email sent successfully.")
-    except Exception as e:
-        logging.error(f"Failed to send test email: {e}")
-
 def send_email(smtp_cfg, all_items):
     msg = EmailMessage()
     msg["Subject"] = "Media Monitor Report"
