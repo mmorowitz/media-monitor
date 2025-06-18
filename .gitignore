@@ -7,3 +7,4 @@ venv/
 .vscode/*
 !.vscode/launch.json
 config.yaml
+config/integration_test_real.yaml

@@ -3,8 +3,8 @@
 ## Overview
 Plan to implement 4 code quality improvements, one at a time with separate commits. Goal: concise, readable code with low duplication.
 
-## 1. Create Base MediaClient Class ⏳
-**Status**: Next to implement  
+## 1. Create Base MediaClient Class ✅
+**Status**: Completed  
 **Problem**: Reddit and YouTube clients have ~30 lines of duplicated code (category handling, common patterns)  
 **Solution**: Extract common functionality into `BaseMediaClient` abstract class  
 **Benefits**: 
@@ -14,17 +14,17 @@ Plan to implement 4 code quality improvements, one at a time with separate commi
 - More maintainable
 
 **Implementation Plan**:
-- [ ] Create `src/base_client.py` with `BaseMediaClient` abstract class
-- [ ] Extract common category/simple format handling in `__init__`
-- [ ] Extract category mapping logic in `get_new_items_since`
-- [ ] Add abstract methods for source-specific behavior
-- [ ] Refactor `reddit_client.py` to inherit from base class
-- [ ] Refactor `youtube_client.py` to inherit from base class
-- [ ] Update tests to ensure no regressions
-- [ ] Commit: "refactor: add base media client class"
+- [x] Create `src/base_client.py` with `BaseMediaClient` abstract class
+- [x] Extract common category/simple format handling in `__init__`
+- [x] Extract category mapping logic in `get_new_items_since`
+- [x] Add abstract methods for source-specific behavior
+- [x] Refactor `reddit_client.py` to inherit from base class
+- [x] Refactor `youtube_client.py` to inherit from base class
+- [x] Update tests to ensure no regressions
+- [x] Commit: "refactor: add base media client class"
 
-## 2. Split Email Formatting from Sending ⏸️
-**Status**: Planned  
+## 2. Split Email Formatting from Sending ⏳
+**Status**: Next to implement  
 **Problem**: `send_email()` function violates single responsibility - formats AND sends  
 **Solution**: Extract `format_email_content()` function  
 **Benefits**:
