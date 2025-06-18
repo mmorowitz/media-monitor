@@ -26,18 +26,23 @@ Plan to implement 4 code quality improvements, one at a time with separate commi
 ## 2. Split Email Formatting from Sending ⏳
 **Status**: Next to implement  
 **Problem**: `send_email()` function violates single responsibility - formats AND sends  
-**Solution**: Extract `format_email_content()` function  
+**Solution**: Extract `format_email_content()` function and separate HTML template  
 **Benefits**:
 - Better separation of concerns
 - Email formatting becomes reusable
 - More testable components
+- Complete separation of presentation from logic
+- Non-developers can modify email layout without touching code
+- Template can be version controlled separately
 
 **Implementation Plan**:
-- [ ] Create `format_email_content(all_items)` function
+- [ ] Create `templates/email_template.html` with placeholder variables
+- [ ] Create `format_email_content(all_items)` function using template
 - [ ] Extract body/HTML generation logic from `send_email()`
 - [ ] Update `send_email()` to use new formatting function
+- [ ] Add templating engine dependency (Jinja2 or simple substitution)
 - [ ] Add tests for email formatting separately from sending
-- [ ] Commit: "refactor: separate email formatting from sending"
+- [ ] Commit: "refactor: separate email formatting with template"
 
 ## 3. Add Configuration Validation ⏸️
 **Status**: Planned  
