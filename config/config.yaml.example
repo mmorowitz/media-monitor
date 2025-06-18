@@ -1,8 +1,22 @@
 reddit:
   enabled: true
+  # Option 1: Simple list (maintains backward compatibility)
   subreddits:
     - SUBREDDIT
     - ANOTHER_SUBREDDIT
+  # Option 2: Categorized format
+  categories:
+    news:
+      - worldnews
+      - politics
+      - technology
+    entertainment:
+      - movies
+      - gaming
+      - music
+    programming:
+      - python
+      - learnprogramming
   client_id: YOUR_CLIENT_ID
   client_secret: YOUR_CLIENT_SECRET
   user_agent: YOUR_USER_AGENT
@@ -10,9 +24,18 @@ reddit:
 youtube:
   enabled: true
   api_key: YOUR_API_KEY
+  # Option 1: Simple list (maintains backward compatibility)
   channels:
     - UC_x5XG1OV2P6uZZ5FSM9Ttw
     - ANOTHER_CHANNEL_ID
+  # Option 2: Categorized format
+  categories:
+    tech:
+      - UC_x5XG1OV2P6uZZ5FSM9Ttw
+      - UCXuqSBlHAE6Xw-yeJA0Tunw
+    education:
+      - UC2C_jShtL725hvbm1arSV9w
+      - UCJ0-OtVpF0wOKEqT2Z1HEtA
 
 smtp:
   enabled: false

@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 
-from main import load_config, process_source, load_smtp_settings, send_email
+from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category
 
 
 class TestLoadConfig:
@@ -227,3 +227,117 @@ class TestSendEmail:
         assert 'Reddit:' in message_content
         assert 'Youtube:' in message_content
         assert 'No new items' in message_content
+
+
+class TestGroupItemsByCategory:
+    def test_group_items_no_categories(self):
+        items = [
+            {'id': '1', 'title': 'Test 1'},
+            {'id': '2', 'title': 'Test 2'}
+        ]
+        
+        result = group_items_by_category(items)
+        
+        assert result == {'uncategorized': items}
+    
+    def test_group_items_with_categories(self):
+        items = [
+            {'id': '1', 'title': 'News Item', 'category': 'news'},
+            {'id': '2', 'title': 'Tech Item', 'category': 'tech'},
+            {'id': '3', 'title': 'Another News', 'category': 'news'}
+        ]
+        
+        result = group_items_by_category(items)
+        
+        expected = {
+            'news': [
+                {'id': '1', 'title': 'News Item', 'category': 'news'},
+                {'id': '3', 'title': 'Another News', 'category': 'news'}
+            ],
+            'tech': [
+                {'id': '2', 'title': 'Tech Item', 'category': 'tech'}
+            ]
+        }
+        assert result == expected
+    
+    def test_group_items_mixed_categorization(self):
+        items = [
+            {'id': '1', 'title': 'Categorized', 'category': 'news'},
+            {'id': '2', 'title': 'Uncategorized'}
+        ]
+        
+        result = group_items_by_category(items)
+        
+        expected = {
+            'news': [{'id': '1', 'title': 'Categorized', 'category': 'news'}],
+            'uncategorized': [{'id': '2', 'title': 'Uncategorized'}]
+        }
+        assert result == expected
+    
+    def test_group_items_empty_list(self):
+        result = group_items_by_category([])
+        assert result == {'uncategorized': []}
+
+
+class TestSendEmailWithCategories:
+    def setup_method(self):
+        self.smtp_cfg = {
+            'server': 'smtp.example.com',
+            'port': 587,
+            'username': 'test@example.com',
+            'password': 'password',
+            'from': 'test@example.com',
+            'to': ['recipient@example.com']
+        }
+    
+    @patch('main.smtplib.SMTP_SSL')
+    def test_send_email_with_categorized_items(self, mock_smtp):
+        mock_server = Mock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+        
+        all_items = {
+            'reddit': [
+                {'id': '1', 'title': 'News Post', 'url': 'https://reddit.com/1', 'category': 'news'},
+                {'id': '2', 'title': 'Tech Post', 'url': 'https://reddit.com/2', 'category': 'tech'},
+                {'id': '3', 'title': 'Another News', 'url': 'https://reddit.com/3', 'category': 'news'}
+            ]
+        }
+        
+        send_email(self.smtp_cfg, all_items)
+        
+        mock_smtp.assert_called_once_with('smtp.example.com', 587)
+        mock_server.login.assert_called_once_with('test@example.com', 'password')
+        mock_server.send_message.assert_called_once()
+        
+        # Check that message contains category groupings
+        call_args = mock_server.send_message.call_args[0][0]
+        message_content = str(call_args)
+        assert 'News:' in message_content
+        assert 'Tech:' in message_content
+        assert 'News Post' in message_content
+        assert 'Tech Post' in message_content
+    
+    @patch('main.smtplib.SMTP_SSL')
+    def test_send_email_mixed_sources_with_categories(self, mock_smtp):
+        mock_server = Mock()
+        mock_smtp.return_value.__enter__.return_value = mock_server
+        
+        all_items = {
+            'reddit': [
+                {'id': '1', 'title': 'Reddit News', 'url': 'https://reddit.com/1', 'category': 'news'}
+            ],
+            'youtube': [
+                {'id': '2', 'title': 'YouTube Tech', 'url': 'https://youtube.com/2', 'category': 'tech'},
+                {'id': '3', 'title': 'Uncategorized Video', 'url': 'https://youtube.com/3'}
+            ]
+        }
+        
+        send_email(self.smtp_cfg, all_items)
+        
+        call_args = mock_server.send_message.call_args[0][0]
+        message_content = str(call_args)
+        assert 'Reddit:' in message_content
+        assert 'Youtube:' in message_content
+        assert 'Reddit News' in message_content
+        assert 'YouTube Tech' in message_content
+        assert 'Uncategorized Video' in message_content

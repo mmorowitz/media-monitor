@@ -58,6 +58,24 @@ def load_smtp_settings(config):
         return None
     return smtp_cfg
 
+def group_items_by_category(items):
+    """
+    Group items by category if they have category information.
+    Returns a dict with categories as keys and items as values.
+    """
+    if not items or not any(item.get('category') for item in items):
+        # No categorization, return as single "uncategorized" group
+        return {'uncategorized': items}
+    
+    categorized = {}
+    for item in items:
+        category = item.get('category', 'uncategorized')
+        if category not in categorized:
+            categorized[category] = []
+        categorized[category].append(item)
+    
+    return categorized
+
 def send_email(smtp_cfg, all_items):
     msg = EmailMessage()
     msg["Subject"] = "Media Monitor Report"
@@ -72,18 +90,34 @@ def send_email(smtp_cfg, all_items):
         html_body = "<h2>New items found:</h2>"
         for source, items in all_items.items():
             body += f"{source.capitalize()}:\n"
-            html_body += f"<h3>{source.capitalize()}:</h3><ul>"
+            html_body += f"<h3>{source.capitalize()}:</h3>"
+            
             if items:
-                for item in items:
-                    title = item.get('title', 'No Title')
-                    url = item.get('url', '#')
-                    body += f"- {title} (ID: {item.get('id', 'N/A')})\n"
-                    html_body += f'<li><a href="{url}">{title}</a> (ID: {item.get("id", "N/A")})</li>'
+                # Group items by category
+                categorized_items = group_items_by_category(items)
+                
+                for category, category_items in categorized_items.items():
+                    if len(categorized_items) > 1:  # Only show category headers if there are multiple categories
+                        body += f"  {category.capitalize()}:\n"
+                        html_body += f"<h4>{category.capitalize()}:</h4>"
+                    
+                    html_body += "<ul>"
+                    for item in category_items:
+                        title = item.get('title', 'No Title')
+                        url = item.get('url', '#')
+                        if len(categorized_items) > 1:
+                            body += f"    - {title} (ID: {item.get('id', 'N/A')})\n"
+                        else:
+                            body += f"- {title} (ID: {item.get('id', 'N/A')})\n"
+                        html_body += f'<li><a href="{url}">{title}</a> (ID: {item.get("id", "N/A")})</li>'
+                    html_body += "</ul>"
+                    
+                    if len(categorized_items) > 1:
+                        body += "\n"
             else:
                 body += "No new items.\n"
-                html_body += "<li>No new items.</li>"
+                html_body += "<p>No new items.</p>"
             body += "\n"
-            html_body += "</ul>"
 
     msg.set_content(body)
     msg.add_alternative(html_body, subtype='html')

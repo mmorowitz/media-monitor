@@ -55,5 +55,11 @@ Both Reddit and YouTube clients implement the same interface:
 **Configuration:**
 YAML-based configuration in `config/config.yaml` with sections for `reddit`, `youtube`, and `smtp`. Each section has an `enabled` flag to control which services are active.
 
+Both Reddit and YouTube sources support two configuration formats:
+1. **Simple format** (backward compatible): List subreddits/channels directly
+2. **Categorized format**: Group subreddits/channels under named categories for organized email output
+
+When using categories, email output groups items by category within each source section.
+
 **Logging:**
 Uses rotating file handler writing to `logs/app.log` with 5MB rotation and 5 backup files.

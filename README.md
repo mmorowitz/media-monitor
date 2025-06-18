@@ -6,6 +6,7 @@ Media Monitor is a Python application that tracks new posts from specified Reddi
 
 - Monitors multiple Reddit subreddits for new posts
 - Monitors multiple YouTube channels for new videos
+- **Optional categorization**: Group subreddits and channels by category for organized email output
 - Sends email notifications with a summary of new items
 - Configurable via YAML file
 - Uses SQLite for tracking last checked times
@@ -37,7 +38,9 @@ Media Monitor is a Python application that tracks new posts from specified Reddi
 
 ## Configuration
 
-Edit `config/config.yaml` to set up your sources and email settings. Example:
+Edit `config/config.yaml` to set up your sources and email settings.
+
+### Simple Configuration (Backward Compatible)
 
 ```yaml
 reddit:
@@ -65,6 +68,54 @@ smtp:
     - recipient@example.com
   subject: Media Monitor Report
 ```
+
+### Categorized Configuration
+
+For better organization, you can group subreddits and channels by category:
+
+```yaml
+reddit:
+  enabled: true
+  categories:
+    news:
+      - worldnews
+      - politics
+      - technology
+    entertainment:
+      - movies
+      - gaming
+      - music
+    programming:
+      - python
+      - learnprogramming
+  client_id: YOUR_CLIENT_ID
+  client_secret: YOUR_CLIENT_SECRET
+  user_agent: YOUR_USER_AGENT
+
+youtube:
+  enabled: true
+  categories:
+    tech:
+      - UC_x5XG1OV2P6uZZ5FSM9Ttw
+      - UCXuqSBlHAE6Xw-yeJA0Tunw
+    education:
+      - UC2C_jShtL725hvbm1arSV9w
+      - UCJ0-OtVpF0wOKEqT2Z1HEtA
+  api_key: YOUR_API_KEY
+
+smtp:
+  enabled: true
+  server: smtp.example.com
+  port: 465
+  username: your@email.com
+  password: yourpassword
+  from: your@email.com
+  to:
+    - recipient@example.com
+  subject: Media Monitor Report
+```
+
+When using categories, the email report will group items by category within each source, making it easier to scan through different types of content.
 
 ## Usage
 
