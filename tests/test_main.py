@@ -1,5 +1,8 @@
+import pytest
+import yaml
 from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
+from email.message import EmailMessage
 
 from main import load_config, process_source, load_smtp_settings, send_email
 
@@ -83,6 +86,7 @@ class TestProcessSource:
         self.mock_client.get_new_items_since.return_value = mock_items
         
         current_time = datetime.now(timezone.utc)
+        default_time = current_time - timedelta(hours=72)
         mock_datetime.now.return_value = current_time
         mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs) if args else current_time
         
