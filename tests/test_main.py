@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 
-from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category
+from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source
 
 
 class TestLoadConfig:
@@ -179,10 +179,10 @@ class TestSendEmail:
         
         all_items = {
             'reddit': [
-                {'id': '1', 'title': 'Test Post', 'url': 'https://reddit.com/1'}
+                {'id': '1', 'title': 'Test Post', 'url': 'https://reddit.com/1', 'subreddit': 'python'}
             ],
             'youtube': [
-                {'id': '2', 'title': 'Test Video', 'url': 'https://youtube.com/2'}
+                {'id': '2', 'title': 'Test Video', 'url': 'https://youtube.com/2', 'channel_id': 'UC123'}
             ]
         }
         
@@ -192,11 +192,13 @@ class TestSendEmail:
         mock_server.login.assert_called_once_with('test@example.com', 'password')
         mock_server.send_message.assert_called_once()
         
-        # Check that message contains the items
+        # Check that message contains the items and sources
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
         assert 'Test Post' in message_content
         assert 'Test Video' in message_content
+        assert 'python:' in message_content
+        assert 'UC123:' in message_content
     
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
@@ -229,54 +231,112 @@ class TestSendEmail:
         assert 'No new items' in message_content
 
 
-class TestGroupItemsByCategory:
-    def test_group_items_no_categories(self):
+class TestGroupBySource:
+    def test_group_by_source_reddit(self):
         items = [
-            {'id': '1', 'title': 'Test 1'},
-            {'id': '2', 'title': 'Test 2'}
+            {'id': '1', 'title': 'Test 1', 'subreddit': 'python'},
+            {'id': '2', 'title': 'Test 2', 'subreddit': 'python'},
+            {'id': '3', 'title': 'Test 3', 'subreddit': 'programming'}
         ]
         
-        result = group_items_by_category(items)
+        result = group_by_source(items)
         
-        assert result == {'uncategorized': items}
+        expected = {
+            'python': [
+                {'id': '1', 'title': 'Test 1', 'subreddit': 'python'},
+                {'id': '2', 'title': 'Test 2', 'subreddit': 'python'}
+            ],
+            'programming': [
+                {'id': '3', 'title': 'Test 3', 'subreddit': 'programming'}
+            ]
+        }
+        assert result == expected
+    
+    def test_group_by_source_youtube(self):
+        items = [
+            {'id': '1', 'title': 'Video 1', 'channel_id': 'UC123'},
+            {'id': '2', 'title': 'Video 2', 'channel_id': 'UC456'}
+        ]
+        
+        result = group_by_source(items)
+        
+        expected = {
+            'UC123': [{'id': '1', 'title': 'Video 1', 'channel_id': 'UC123'}],
+            'UC456': [{'id': '2', 'title': 'Video 2', 'channel_id': 'UC456'}]
+        }
+        assert result == expected
+    
+    def test_group_by_source_unknown(self):
+        items = [
+            {'id': '1', 'title': 'Test Item'}
+        ]
+        
+        result = group_by_source(items)
+        
+        expected = {
+            'unknown': [{'id': '1', 'title': 'Test Item'}]
+        }
+        assert result == expected
+
+
+class TestGroupItemsByCategoryAndSource:
+    def test_group_items_no_categories(self):
+        items = [
+            {'id': '1', 'title': 'Test 1', 'subreddit': 'python'},
+            {'id': '2', 'title': 'Test 2', 'subreddit': 'programming'}
+        ]
+        
+        result = group_items_by_category_and_source(items)
+        
+        expected = {
+            'uncategorized': {
+                'python': [{'id': '1', 'title': 'Test 1', 'subreddit': 'python'}],
+                'programming': [{'id': '2', 'title': 'Test 2', 'subreddit': 'programming'}]
+            }
+        }
+        assert result == expected
     
     def test_group_items_with_categories(self):
         items = [
-            {'id': '1', 'title': 'News Item', 'category': 'news'},
-            {'id': '2', 'title': 'Tech Item', 'category': 'tech'},
-            {'id': '3', 'title': 'Another News', 'category': 'news'}
+            {'id': '1', 'title': 'News Item', 'category': 'news', 'subreddit': 'worldnews'},
+            {'id': '2', 'title': 'Tech Item', 'category': 'tech', 'subreddit': 'python'},
+            {'id': '3', 'title': 'Another News', 'category': 'news', 'subreddit': 'politics'}
         ]
         
-        result = group_items_by_category(items)
+        result = group_items_by_category_and_source(items)
         
         expected = {
-            'news': [
-                {'id': '1', 'title': 'News Item', 'category': 'news'},
-                {'id': '3', 'title': 'Another News', 'category': 'news'}
-            ],
-            'tech': [
-                {'id': '2', 'title': 'Tech Item', 'category': 'tech'}
-            ]
+            'news': {
+                'worldnews': [{'id': '1', 'title': 'News Item', 'category': 'news', 'subreddit': 'worldnews'}],
+                'politics': [{'id': '3', 'title': 'Another News', 'category': 'news', 'subreddit': 'politics'}]
+            },
+            'tech': {
+                'python': [{'id': '2', 'title': 'Tech Item', 'category': 'tech', 'subreddit': 'python'}]
+            }
         }
         assert result == expected
     
     def test_group_items_mixed_categorization(self):
         items = [
-            {'id': '1', 'title': 'Categorized', 'category': 'news'},
-            {'id': '2', 'title': 'Uncategorized'}
+            {'id': '1', 'title': 'Categorized', 'category': 'news', 'subreddit': 'worldnews'},
+            {'id': '2', 'title': 'Uncategorized', 'subreddit': 'python'}
         ]
         
-        result = group_items_by_category(items)
+        result = group_items_by_category_and_source(items)
         
         expected = {
-            'news': [{'id': '1', 'title': 'Categorized', 'category': 'news'}],
-            'uncategorized': [{'id': '2', 'title': 'Uncategorized'}]
+            'news': {
+                'worldnews': [{'id': '1', 'title': 'Categorized', 'category': 'news', 'subreddit': 'worldnews'}]
+            },
+            'uncategorized': {
+                'python': [{'id': '2', 'title': 'Uncategorized', 'subreddit': 'python'}]
+            }
         }
         assert result == expected
     
     def test_group_items_empty_list(self):
-        result = group_items_by_category([])
-        assert result == {'uncategorized': []}
+        result = group_items_by_category_and_source([])
+        assert result == {}
 
 
 class TestSendEmailWithCategories:
@@ -297,9 +357,9 @@ class TestSendEmailWithCategories:
         
         all_items = {
             'reddit': [
-                {'id': '1', 'title': 'News Post', 'url': 'https://reddit.com/1', 'category': 'news'},
-                {'id': '2', 'title': 'Tech Post', 'url': 'https://reddit.com/2', 'category': 'tech'},
-                {'id': '3', 'title': 'Another News', 'url': 'https://reddit.com/3', 'category': 'news'}
+                {'id': '1', 'title': 'News Post', 'url': 'https://reddit.com/1', 'category': 'news', 'subreddit': 'worldnews'},
+                {'id': '2', 'title': 'Tech Post', 'url': 'https://reddit.com/2', 'category': 'tech', 'subreddit': 'python'},
+                {'id': '3', 'title': 'Another News', 'url': 'https://reddit.com/3', 'category': 'news', 'subreddit': 'politics'}
             ]
         }
         
@@ -309,11 +369,14 @@ class TestSendEmailWithCategories:
         mock_server.login.assert_called_once_with('test@example.com', 'password')
         mock_server.send_message.assert_called_once()
         
-        # Check that message contains category groupings
+        # Check that message contains category and source groupings
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
         assert 'News:' in message_content
         assert 'Tech:' in message_content
+        assert 'worldnews:' in message_content
+        assert 'python:' in message_content
+        assert 'politics:' in message_content
         assert 'News Post' in message_content
         assert 'Tech Post' in message_content
     
@@ -324,11 +387,11 @@ class TestSendEmailWithCategories:
         
         all_items = {
             'reddit': [
-                {'id': '1', 'title': 'Reddit News', 'url': 'https://reddit.com/1', 'category': 'news'}
+                {'id': '1', 'title': 'Reddit News', 'url': 'https://reddit.com/1', 'category': 'news', 'subreddit': 'worldnews'}
             ],
             'youtube': [
-                {'id': '2', 'title': 'YouTube Tech', 'url': 'https://youtube.com/2', 'category': 'tech'},
-                {'id': '3', 'title': 'Uncategorized Video', 'url': 'https://youtube.com/3'}
+                {'id': '2', 'title': 'YouTube Tech', 'url': 'https://youtube.com/2', 'category': 'tech', 'channel_id': 'UC123'},
+                {'id': '3', 'title': 'Uncategorized Video', 'url': 'https://youtube.com/3', 'channel_id': 'UC456'}
             ]
         }
         
@@ -338,6 +401,9 @@ class TestSendEmailWithCategories:
         message_content = str(call_args)
         assert 'Reddit:' in message_content
         assert 'Youtube:' in message_content
+        assert 'worldnews:' in message_content
+        assert 'UC123:' in message_content
+        assert 'UC456:' in message_content
         assert 'Reddit News' in message_content
         assert 'YouTube Tech' in message_content
         assert 'Uncategorized Video' in message_content

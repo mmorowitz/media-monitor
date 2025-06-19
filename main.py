@@ -58,23 +58,44 @@ def load_smtp_settings(config):
         return None
     return smtp_cfg
 
-def group_items_by_category(items):
+def group_items_by_category_and_source(items):
     """
-    Group items by category if they have category information.
-    Returns a dict with categories as keys and items as values.
+    Group items by category (optional) and then by source (subreddit/channel).
+    Returns a nested dict structure.
     """
-    if not items or not any(item.get('category') for item in items):
-        # No categorization, return as single "uncategorized" group
-        return {'uncategorized': items}
+    if not items:
+        return {}
     
-    categorized = {}
+    # First group by category if categories exist
+    has_categories = any(item.get('category') for item in items)
+    
+    if has_categories:
+        # Group by category first
+        categorized = {}
+        for item in items:
+            category = item.get('category', 'uncategorized')
+            if category not in categorized:
+                categorized[category] = []
+            categorized[category].append(item)
+        
+        # Then group each category by source
+        result = {}
+        for category, category_items in categorized.items():
+            result[category] = group_by_source(category_items)
+        return result
+    else:
+        # No categories, just group by source
+        return {'uncategorized': group_by_source(items)}
+
+def group_by_source(items):
+    """Group items by their source (subreddit or channel_id)."""
+    grouped = {}
     for item in items:
-        category = item.get('category', 'uncategorized')
-        if category not in categorized:
-            categorized[category] = []
-        categorized[category].append(item)
-    
-    return categorized
+        source = item.get('subreddit') or item.get('channel_id', 'unknown')
+        if source not in grouped:
+            grouped[source] = []
+        grouped[source].append(item)
+    return grouped
 
 def send_email(smtp_cfg, all_items):
     msg = EmailMessage()
@@ -88,31 +109,41 @@ def send_email(smtp_cfg, all_items):
     else:
         body = "New items found:\n\n"
         html_body = "<h2>New items found:</h2>"
-        for source, items in all_items.items():
-            body += f"{source.capitalize()}:\n"
-            html_body += f"<h3>{source.capitalize()}:</h3>"
+        for service, items in all_items.items():
+            body += f"{service.capitalize()}:\n"
+            html_body += f"<h3>{service.capitalize()}:</h3>"
             
             if items:
-                # Group items by category
-                categorized_items = group_items_by_category(items)
+                # Group items by category and source
+                grouped_items = group_items_by_category_and_source(items)
                 
-                for category, category_items in categorized_items.items():
-                    if len(categorized_items) > 1:  # Only show category headers if there are multiple categories
+                for category, sources in grouped_items.items():
+                    # Only show category headers if there are multiple categories
+                    if len(grouped_items) > 1 and category != 'uncategorized':
                         body += f"  {category.capitalize()}:\n"
                         html_body += f"<h4>{category.capitalize()}:</h4>"
                     
-                    html_body += "<ul>"
-                    for item in category_items:
-                        title = item.get('title', 'No Title')
-                        url = item.get('url', '#')
-                        if len(categorized_items) > 1:
-                            body += f"    - {title} (ID: {item.get('id', 'N/A')})\n"
+                    for source, source_items in sources.items():
+                        # Add source header
+                        if len(grouped_items) > 1 and category != 'uncategorized':
+                            body += f"    {source}:\n"
+                            html_body += f"<h5>{source}:</h5>"
                         else:
-                            body += f"- {title} (ID: {item.get('id', 'N/A')})\n"
-                        html_body += f'<li><a href="{url}">{title}</a> (ID: {item.get("id", "N/A")})</li>'
-                    html_body += "</ul>"
+                            body += f"  {source}:\n"
+                            html_body += f"<h4>{source}:</h4>"
+                        
+                        html_body += "<ul>"
+                        for item in source_items:
+                            title = item.get('title', 'No Title')
+                            url = item.get('url', '#')
+                            if len(grouped_items) > 1 and category != 'uncategorized':
+                                body += f"      - {title} (ID: {item.get('id', 'N/A')})\n"
+                            else:
+                                body += f"    - {title} (ID: {item.get('id', 'N/A')})\n"
+                            html_body += f'<li><a href="{url}">{title}</a> (ID: {item.get("id", "N/A")})</li>'
+                        html_body += "</ul>"
                     
-                    if len(categorized_items) > 1:
+                    if len(grouped_items) > 1:
                         body += "\n"
             else:
                 body += "No new items.\n"

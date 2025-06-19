@@ -218,7 +218,7 @@ class TestFullIntegration:
         
         print("\n=== Testing Email Integration ===")
         
-        # Create test data with categories
+        # Create test data with categories and sources
         test_items = {
             'reddit': [
                 {
@@ -226,7 +226,8 @@ class TestFullIntegration:
                     'title': 'Integration Test Reddit Post',
                     'url': 'https://reddit.com/r/test/comments/test1',
                     'created_utc': datetime.now(timezone.utc),
-                    'category': 'test'
+                    'category': 'test',
+                    'subreddit': 'test'
                 }
             ],
             'youtube': [
@@ -235,7 +236,8 @@ class TestFullIntegration:
                     'title': 'Integration Test YouTube Video',
                     'url': 'https://youtube.com/watch?v=test1',
                     'published_at': datetime.now(timezone.utc),
-                    'category': 'test'
+                    'category': 'test',
+                    'channel_id': 'UCtest123'
                 }
             ]
         }
