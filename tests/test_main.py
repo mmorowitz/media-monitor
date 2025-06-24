@@ -136,7 +136,7 @@ class TestProcessSource:
     def test_process_source_disabled(self):
         config = {'reddit': {'enabled': False}}
         
-        result = process_source('reddit', self.mock_client_class, config, self.mock_db_conn)
+        result = process_source('reddit', self.mock_client_class, config)
         
         assert result == []
         self.mock_client_class.assert_not_called()
@@ -144,7 +144,7 @@ class TestProcessSource:
     def test_process_source_missing_config(self):
         config = {}
         
-        result = process_source('reddit', self.mock_client_class, config, self.mock_db_conn)
+        result = process_source('reddit', self.mock_client_class, config)
         
         assert result == []
         self.mock_client_class.assert_not_called()
@@ -167,13 +167,13 @@ class TestProcessSource:
         mock_datetime.now.return_value = current_time
         mock_datetime.fromisoformat = datetime.fromisoformat
         
-        result = process_source('reddit', self.mock_client_class, config, self.mock_db_conn)
+        result = process_source('reddit', self.mock_client_class, config)
         
         assert result == mock_items
         self.mock_client_class.assert_called_once_with(config['reddit'])
-        mock_get.assert_called_once_with(self.mock_db_conn, 'reddit')
+        mock_get.assert_called_once_with('reddit')
         self.mock_client.get_new_items_since.assert_called_once()
-        mock_update.assert_called_once_with(self.mock_db_conn, 'reddit', current_time)
+        mock_update.assert_called_once_with('reddit', current_time)
     
     @patch('main.get_last_checked')
     @patch('main.update_last_checked')
@@ -190,13 +190,13 @@ class TestProcessSource:
         mock_datetime.now.return_value = current_time
         mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs) if args else current_time
         
-        result = process_source('youtube', self.mock_client_class, config, self.mock_db_conn)
+        result = process_source('youtube', self.mock_client_class, config)
         
         assert result == mock_items
         self.mock_client_class.assert_called_once_with(config['youtube'])
-        mock_get.assert_called_once_with(self.mock_db_conn, 'youtube')
+        mock_get.assert_called_once_with('youtube')
         self.mock_client.get_new_items_since.assert_called_once()
-        mock_update.assert_called_once_with(self.mock_db_conn, 'youtube', current_time)
+        mock_update.assert_called_once_with('youtube', current_time)
 
 
 class TestLoadSmtpSettings:

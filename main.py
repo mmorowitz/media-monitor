@@ -79,13 +79,13 @@ def validate_config(config):
     
     logging.info("Configuration validation passed")
 
-def process_source(source_name, client_class, config, db_conn):
+def process_source(source_name, client_class, config):
     items = []
     if config.get(source_name, {}).get("enabled"):
         try:
             logging.info(f"{source_name.capitalize()} integration is enabled.")
             client = client_class(config[source_name])
-            last_checked = get_last_checked(db_conn, source_name)
+            last_checked = get_last_checked(source_name)
             if last_checked:
                 last_checked = datetime.fromisoformat(last_checked)
                 if last_checked.tzinfo is None:
@@ -102,7 +102,7 @@ def process_source(source_name, client_class, config, db_conn):
             for item in new_items:
                 logging.debug(f"New {source_name} item: {item['title']} (ID: {item['id']})")
 
-            update_last_checked(db_conn, source_name, datetime.now(timezone.utc))
+            update_last_checked(source_name, datetime.now(timezone.utc))
             logging.info(f"Updated last checked time for {source_name.capitalize()} in the database.")
             items = new_items
         except Exception as e:
@@ -228,14 +228,13 @@ def main():
     config = load_config()
     logging.info("Loaded configuration")
 
-    db_conn = init_db()
-    logging.info("Database initialized")
+    if not init_db():
+        logging.error("Failed to initialize database. Exiting.")
+        return
 
     all_items = {}
-    all_items["reddit"] = process_source("reddit", RedditClient, config, db_conn)
-    all_items["youtube"] = process_source("youtube", YouTubeClient, config, db_conn)
-
-    db_conn.close()
+    all_items["reddit"] = process_source("reddit", RedditClient, config)
+    all_items["youtube"] = process_source("youtube", YouTubeClient, config)
 
     smtp_cfg = load_smtp_settings(config)
     if smtp_cfg:

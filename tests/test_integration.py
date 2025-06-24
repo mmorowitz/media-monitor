@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from main import main, load_config, process_source, send_email, load_smtp_settings
 from src.reddit_client import RedditClient
 from src.youtube_client import YouTubeClient
-from src.db import init_db, get_last_checked, update_last_checked
+from src.db import init_db, get_last_checked_with_conn as get_last_checked, update_last_checked_with_conn as update_last_checked
 
 
 # Mark all tests in this class as requiring explicit invocation
@@ -195,7 +195,23 @@ class TestFullIntegration:
         
         # Test Reddit if enabled
         if integration_config.get('reddit', {}).get('enabled'):
-            reddit_items = process_source('reddit', RedditClient, integration_config, temp_db)
+            # Create a wrapper to use legacy database connection pattern
+            def process_source_with_db(source_name, client_class, config, db_conn):
+                # Temporarily monkey patch the database functions to use the connection
+                import main
+                original_get = main.get_last_checked
+                original_update = main.update_last_checked
+                
+                main.get_last_checked = lambda source: get_last_checked(db_conn, source)
+                main.update_last_checked = lambda source, timestamp: update_last_checked(db_conn, source, timestamp)
+                
+                try:
+                    return main.process_source(source_name, client_class, config)
+                finally:
+                    main.get_last_checked = original_get
+                    main.update_last_checked = original_update
+            
+            reddit_items = process_source_with_db('reddit', RedditClient, integration_config, temp_db)
             print(f"Reddit process_source returned {len(reddit_items)} items")
             assert isinstance(reddit_items, list)
             
@@ -206,7 +222,7 @@ class TestFullIntegration:
         
         # Test YouTube if enabled
         if integration_config.get('youtube', {}).get('enabled'):
-            youtube_items = process_source('youtube', YouTubeClient, integration_config, temp_db)
+            youtube_items = process_source_with_db('youtube', YouTubeClient, integration_config, temp_db)
             print(f"YouTube process_source returned {len(youtube_items)} items")
             assert isinstance(youtube_items, list)
             
