@@ -1,6 +1,8 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import yaml
+import time
+import os
 from datetime import datetime, timedelta, timezone
 from src.db import init_db, get_last_checked, update_last_checked
 from src.reddit_client import RedditClient
@@ -19,10 +21,56 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+def _apply_env_overrides(config):
+    """Apply environment variable overrides to configuration.
+    
+    Environment variables should be in the format:
+    MEDIA_MONITOR_<SERVICE>_<FIELD> = value
+    
+    Examples:
+    - MEDIA_MONITOR_REDDIT_CLIENT_ID overrides reddit.client_id
+    - MEDIA_MONITOR_SMTP_PASSWORD overrides smtp.password
+    - MEDIA_MONITOR_YOUTUBE_API_KEY overrides youtube.api_key
+    """
+    env_prefix = "MEDIA_MONITOR_"
+    
+    for env_key, env_value in os.environ.items():
+        if not env_key.startswith(env_prefix):
+            continue
+        
+        # Parse the environment variable name
+        config_path = env_key[len(env_prefix):].lower().split('_')
+        if len(config_path) < 2:
+            continue
+        
+        service = config_path[0]
+        field = '_'.join(config_path[1:])
+        
+        # Apply the override
+        if service not in config:
+            config[service] = {}
+        
+        # Convert certain values to appropriate types
+        if field == 'enabled':
+            env_value = env_value.lower() in ('true', '1', 'yes', 'on')
+        elif field == 'port':
+            try:
+                env_value = int(env_value)
+            except ValueError:
+                logging.warning(f"Invalid port value in {env_key}: {env_value}")
+                continue
+        elif field == 'to' and service == 'smtp':
+            # Split comma-separated email addresses
+            env_value = [email.strip() for email in env_value.split(',')]
+        
+        config[service][field] = env_value
+        logging.info(f"Applied environment override: {service}.{field}")
+
 def load_config(filename='config/config.yaml'):
     try:
         with open(filename, 'r') as file:
             config = yaml.safe_load(file)
+            _apply_env_overrides(config)
             validate_config(config)
             return config
     except FileNotFoundError:
@@ -236,13 +284,49 @@ def send_email(smtp_cfg, all_items):
     msg.set_content(body)
     msg.add_alternative(html_body, subtype='html')
 
-    try:
-        with smtplib.SMTP_SSL(smtp_cfg["server"], smtp_cfg["port"]) as server:
-            server.login(smtp_cfg["username"], smtp_cfg["password"])
-            server.send_message(msg)
-        logging.info("Email sent successfully.")
-    except Exception as e:
-        logging.error(f"Failed to send email: {e}")
+    _send_email_with_retry(smtp_cfg, msg)
+
+def _send_email_with_retry(smtp_cfg, msg, max_retries=3, base_delay=1.0):
+    """Send email with exponential backoff retry logic."""
+    for attempt in range(max_retries):
+        try:
+            with smtplib.SMTP_SSL(smtp_cfg["server"], smtp_cfg["port"]) as server:
+                server.login(smtp_cfg["username"], smtp_cfg["password"])
+                server.send_message(msg)
+            logging.info("Email sent successfully.")
+            return True
+        
+        except smtplib.SMTPAuthenticationError as e:
+            logging.error(f"SMTP Authentication failed: {e}")
+            # Don't retry authentication failures
+            return False
+        
+        except smtplib.SMTPRecipientsRefused as e:
+            logging.error(f"SMTP Recipients refused: {e}")
+            # Don't retry recipient errors
+            return False
+        
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, smtplib.SMTPException) as e:
+            attempt_num = attempt + 1
+            if attempt_num < max_retries:
+                delay = base_delay * (2 ** attempt)  # Exponential backoff
+                logging.warning(f"SMTP error on attempt {attempt_num}/{max_retries}: {e}. Retrying in {delay:.1f} seconds...")
+                time.sleep(delay)
+            else:
+                logging.error(f"Failed to send email after {max_retries} attempts: {e}")
+                return False
+        
+        except Exception as e:
+            attempt_num = attempt + 1
+            if attempt_num < max_retries:
+                delay = base_delay * (2 ** attempt)  # Exponential backoff
+                logging.warning(f"Unexpected error on attempt {attempt_num}/{max_retries}: {e}. Retrying in {delay:.1f} seconds...")
+                time.sleep(delay)
+            else:
+                logging.error(f"Failed to send email after {max_retries} attempts with unexpected error: {e}")
+                return False
+    
+    return False
 
 def main():
     logging.info("Starting the application...")

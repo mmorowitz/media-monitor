@@ -1,10 +1,11 @@
 import pytest
 import yaml
+import smtplib
 from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 
-from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config, _format_service_items
+from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config, _format_service_items, _apply_env_overrides
 
 
 class TestLoadConfig:
@@ -35,6 +36,109 @@ class TestLoadConfig:
                 with patch('main.validate_config'):  # Skip validation for this test
                     load_config()
                     mock_file.assert_called_once_with('config/config.yaml', 'r')
+
+
+class TestEnvironmentOverrides:
+    def test_apply_env_overrides_reddit_config(self):
+        config = {'reddit': {'enabled': False, 'client_id': 'original_id'}}
+        
+        with patch.dict('os.environ', {
+            'MEDIA_MONITOR_REDDIT_CLIENT_ID': 'new_id',
+            'MEDIA_MONITOR_REDDIT_ENABLED': 'true',
+            'MEDIA_MONITOR_REDDIT_CLIENT_SECRET': 'secret123'
+        }):
+            _apply_env_overrides(config)
+        
+        assert config['reddit']['client_id'] == 'new_id'
+        assert config['reddit']['enabled'] is True
+        assert config['reddit']['client_secret'] == 'secret123'
+    
+    def test_apply_env_overrides_smtp_config(self):
+        config = {'smtp': {'port': 25}}
+        
+        with patch.dict('os.environ', {
+            'MEDIA_MONITOR_SMTP_PORT': '587',
+            'MEDIA_MONITOR_SMTP_PASSWORD': 'mypass',
+            'MEDIA_MONITOR_SMTP_TO': 'user1@example.com, user2@example.com'
+        }):
+            _apply_env_overrides(config)
+        
+        assert config['smtp']['port'] == 587
+        assert config['smtp']['password'] == 'mypass'
+        assert config['smtp']['to'] == ['user1@example.com', 'user2@example.com']
+    
+    def test_apply_env_overrides_youtube_config(self):
+        config = {}
+        
+        with patch.dict('os.environ', {
+            'MEDIA_MONITOR_YOUTUBE_API_KEY': 'youtube_key_123',
+            'MEDIA_MONITOR_YOUTUBE_ENABLED': '1'
+        }):
+            _apply_env_overrides(config)
+        
+        assert config['youtube']['api_key'] == 'youtube_key_123'
+        assert config['youtube']['enabled'] is True
+    
+    def test_apply_env_overrides_boolean_values(self):
+        config = {}
+        
+        with patch.dict('os.environ', {
+            'MEDIA_MONITOR_REDDIT_ENABLED': 'false',
+            'MEDIA_MONITOR_YOUTUBE_ENABLED': '0',
+            'MEDIA_MONITOR_SMTP_ENABLED': 'no'
+        }):
+            _apply_env_overrides(config)
+        
+        assert config['reddit']['enabled'] is False
+        assert config['youtube']['enabled'] is False
+        assert config['smtp']['enabled'] is False
+    
+    def test_apply_env_overrides_invalid_port(self):
+        config = {}
+        
+        with patch.dict('os.environ', {'MEDIA_MONITOR_SMTP_PORT': 'invalid_port'}):
+            with patch('main.logging') as mock_logging:
+                _apply_env_overrides(config)
+                mock_logging.warning.assert_called_once()
+                # Port should not be set due to invalid value
+                assert 'smtp' not in config or 'port' not in config.get('smtp', {})
+    
+    def test_apply_env_overrides_ignores_non_matching_vars(self):
+        config = {}
+        
+        with patch.dict('os.environ', {
+            'OTHER_VAR': 'value',
+            'MEDIA_MONITOR_': 'incomplete',
+            'MEDIA_MONITOR_INVALID': 'single_part'
+        }):
+            _apply_env_overrides(config)
+        
+        # Config should remain empty
+        assert config == {}
+    
+    def test_apply_env_overrides_underscore_fields(self):
+        config = {}
+        
+        with patch.dict('os.environ', {
+            'MEDIA_MONITOR_REDDIT_USER_AGENT': 'MyBot/1.0',
+            'MEDIA_MONITOR_REDDIT_CLIENT_SECRET': 'secret'
+        }):
+            _apply_env_overrides(config)
+        
+        assert config['reddit']['user_agent'] == 'MyBot/1.0'
+        assert config['reddit']['client_secret'] == 'secret'
+
+    @patch('main._apply_env_overrides')
+    @patch('builtins.open', new_callable=mock_open, read_data='reddit:\n  enabled: true')
+    @patch('yaml.safe_load')
+    def test_load_config_applies_env_overrides(self, mock_yaml_load, mock_file, mock_apply_env):
+        mock_config = {'reddit': {'enabled': True}}
+        mock_yaml_load.return_value = mock_config
+        
+        with patch('main.validate_config'):
+            load_config('test.yaml')
+        
+        mock_apply_env.assert_called_once_with(mock_config)
 
 
 class TestValidateConfig:
@@ -382,14 +486,65 @@ class TestSendEmail:
     
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
-    def test_send_email_smtp_error(self, mock_logging, mock_smtp):
+    @patch('main.time.sleep')  # Mock sleep to speed up test
+    def test_send_email_smtp_error(self, mock_sleep, mock_logging, mock_smtp):
         mock_smtp.side_effect = Exception('SMTP connection failed')
         
         all_items = {}
         
         send_email(self.smtp_cfg, all_items)
         
-        mock_logging.error.assert_called_once_with('Failed to send email: SMTP connection failed')
+        # Verify retry logic was triggered (should have 2 warning calls + 1 error call)
+        assert mock_logging.warning.call_count == 2
+        mock_logging.error.assert_called_once_with('Failed to send email after 3 attempts with unexpected error: SMTP connection failed')
+        
+        # Verify exponential backoff delays
+        mock_sleep.assert_any_call(1.0)  # First retry: 1 second
+        mock_sleep.assert_any_call(2.0)  # Second retry: 2 seconds
+    
+    @patch('main.smtplib.SMTP_SSL')
+    @patch('main.logging')
+    def test_send_email_authentication_error_no_retry(self, mock_logging, mock_smtp):
+        # Authentication errors should not be retried
+        mock_smtp.side_effect = smtplib.SMTPAuthenticationError(535, 'Authentication failed')
+        
+        all_items = {}
+        
+        send_email(self.smtp_cfg, all_items)
+        
+        # Should not retry authentication errors
+        mock_logging.warning.assert_not_called()
+        mock_logging.error.assert_called_once_with('SMTP Authentication failed: (535, \'Authentication failed\')')
+    
+    @patch('main.smtplib.SMTP_SSL')
+    @patch('main.logging')
+    @patch('main.time.sleep')
+    def test_send_email_connection_error_with_retry_success(self, mock_sleep, mock_logging, mock_smtp):
+        # Set up mock to fail first time, succeed second time
+        def side_effect(*args, **kwargs):
+            if not hasattr(side_effect, 'call_count'):
+                side_effect.call_count = 0
+            side_effect.call_count += 1
+            
+            if side_effect.call_count == 1:
+                raise smtplib.SMTPConnectError(421, 'Connection failed')
+            else:
+                # Return a proper mock context manager
+                mock_server = Mock()
+                mock_server.__enter__ = Mock(return_value=mock_server)
+                mock_server.__exit__ = Mock(return_value=None)
+                return mock_server
+        
+        mock_smtp.side_effect = side_effect
+        
+        all_items = {}
+        
+        send_email(self.smtp_cfg, all_items)
+        
+        # Should have 1 warning (first failure) and 1 success info
+        mock_logging.warning.assert_called_once()
+        mock_logging.info.assert_called_with('Email sent successfully.')
+        mock_sleep.assert_called_once_with(1.0)  # First retry delay
     
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_empty_items_list(self, mock_smtp):

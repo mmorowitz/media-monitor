@@ -53,7 +53,7 @@ class RedditClient(BaseMediaClient):
                         "score": submission.score
                     }
                     posts.append(post_data)
-        except praw.exceptions.RedditException as e:
+        except praw.exceptions.PRAWException as e:
             logging.error(f"Reddit API error for subreddit '{subreddit}': {e}")
         except Exception as e:
             logging.error(f"Unexpected error fetching from subreddit '{subreddit}': {e}")
