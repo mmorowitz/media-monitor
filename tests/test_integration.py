@@ -117,7 +117,7 @@ class TestFullIntegration:
         # Verify structure of returned items
         if items:
             item = items[0]
-            required_fields = ['id', 'title', 'url', 'created_utc']
+            required_fields = ['id', 'title', 'url', 'created_utc', 'score']
             for field in required_fields:
                 assert field in item, f"Missing field {field} in Reddit item"
             
@@ -232,7 +232,8 @@ class TestFullIntegration:
                     'url': 'https://reddit.com/r/test/comments/test1',
                     'created_utc': datetime.now(timezone.utc),
                     'category': 'test',
-                    'subreddit': 'test'
+                    'subreddit': 'test',
+                    'score': 42
                 }
             ],
             'youtube': [

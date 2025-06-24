@@ -136,11 +136,14 @@ def send_email(smtp_cfg, all_items):
                         for item in source_items:
                             title = item.get('title', 'No Title')
                             url = item.get('url', '#')
+                            item_id = item.get('id', 'N/A')
+                            score = item.get('score')
+                            score_text = f" (Score: {score})" if score is not None else ""
                             if len(grouped_items) > 1 and category != 'uncategorized':
-                                body += f"      - {title} (ID: {item.get('id', 'N/A')})\n"
+                                body += f"      - {title} (ID: {item_id}){score_text}\n"
                             else:
-                                body += f"    - {title} (ID: {item.get('id', 'N/A')})\n"
-                            html_body += f'<li><a href="{url}">{title}</a> (ID: {item.get("id", "N/A")})</li>'
+                                body += f"    - {title} (ID: {item_id}){score_text}\n"
+                            html_body += f'<li><a href="{url}">{title}</a> (ID: {item_id}){score_text}</li>'
                         html_body += "</ul>"
                     
                     if len(grouped_items) > 1:

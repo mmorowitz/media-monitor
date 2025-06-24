@@ -47,7 +47,8 @@ class RedditClient(BaseMediaClient):
                     "url": submission.url,
                     "created_utc": created_utc,
                     "permalink": f"https://reddit.com{submission.permalink}",
-                    "subreddit": subreddit
+                    "subreddit": subreddit,
+                    "score": submission.score
                 }
                 posts.append(post_data)
         return posts
