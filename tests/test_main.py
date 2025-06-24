@@ -4,26 +4,126 @@ from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 
-from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source
+from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config
 
 
 class TestLoadConfig:
     @patch('builtins.open', new_callable=mock_open, read_data='reddit:\n  enabled: true')
     @patch('yaml.safe_load')
     def test_load_config_success(self, mock_yaml_load, mock_file):
-        mock_yaml_load.return_value = {'reddit': {'enabled': True}}
+        # Provide a complete valid configuration
+        mock_config = {
+            'reddit': {
+                'enabled': True,
+                'client_id': 'test_id',
+                'client_secret': 'test_secret',
+                'user_agent': 'test_agent',
+                'subreddits': ['test']
+            }
+        }
+        mock_yaml_load.return_value = mock_config
         
         result = load_config('config/test.yaml')
         
         mock_file.assert_called_once_with('config/test.yaml', 'r')
         mock_yaml_load.assert_called_once()
-        assert result == {'reddit': {'enabled': True}}
+        assert result == mock_config
     
     def test_load_config_default_filename(self):
         with patch('builtins.open', mock_open(read_data='test: data')) as mock_file:
             with patch('yaml.safe_load', return_value={'test': 'data'}):
-                load_config()
-                mock_file.assert_called_once_with('config/config.yaml', 'r')
+                with patch('main.validate_config'):  # Skip validation for this test
+                    load_config()
+                    mock_file.assert_called_once_with('config/config.yaml', 'r')
+
+
+class TestValidateConfig:
+    def test_validate_config_valid_reddit(self):
+        config = {
+            'reddit': {
+                'enabled': True,
+                'client_id': 'test_id',
+                'client_secret': 'test_secret',
+                'user_agent': 'test_agent',
+                'subreddits': ['test']
+            }
+        }
+        # Should not raise an exception
+        validate_config(config)
+    
+    def test_validate_config_missing_reddit_field(self):
+        config = {
+            'reddit': {
+                'enabled': True,
+                'client_id': 'test_id',
+                # Missing client_secret
+                'user_agent': 'test_agent',
+                'subreddits': ['test']
+            }
+        }
+        with pytest.raises(ValueError, match="Reddit configuration missing required field: client_secret"):
+            validate_config(config)
+    
+    def test_validate_config_valid_youtube(self):
+        config = {
+            'youtube': {
+                'enabled': True,
+                'api_key': 'test_key',
+                'channels': ['test_channel']
+            }
+        }
+        # Should not raise an exception
+        validate_config(config)
+    
+    def test_validate_config_missing_youtube_sources(self):
+        config = {
+            'youtube': {
+                'enabled': True,
+                'api_key': 'test_key'
+                # Missing channels and categories
+            }
+        }
+        with pytest.raises(ValueError, match="YouTube configuration must specify either 'channels' or 'categories'"):
+            validate_config(config)
+    
+    def test_validate_config_valid_smtp(self):
+        config = {
+            'smtp': {
+                'enabled': True,
+                'server': 'smtp.example.com',
+                'port': 587,
+                'username': 'user',
+                'password': 'pass',
+                'from': 'from@example.com',
+                'to': ['to@example.com']
+            }
+        }
+        # Should not raise an exception
+        validate_config(config)
+    
+    def test_validate_config_invalid_smtp_port(self):
+        config = {
+            'smtp': {
+                'enabled': True,
+                'server': 'smtp.example.com',
+                'port': 'invalid_port',
+                'username': 'user',
+                'password': 'pass',
+                'from': 'from@example.com',
+                'to': ['to@example.com']
+            }
+        }
+        with pytest.raises(ValueError, match="SMTP port must be a valid integer"):
+            validate_config(config)
+    
+    def test_validate_config_disabled_services(self):
+        config = {
+            'reddit': {'enabled': False},
+            'youtube': {'enabled': False},
+            'smtp': {'enabled': False}
+        }
+        # Should not raise an exception for disabled services
+        validate_config(config)
 
 
 class TestProcessSource:

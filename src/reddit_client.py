@@ -1,4 +1,5 @@
 import praw
+import logging
 from datetime import datetime, timezone
 from .base_client import BaseMediaClient
 
@@ -38,17 +39,23 @@ class RedditClient(BaseMediaClient):
     def _fetch_items_for_source(self, subreddit, since_datetime):
         """Fetch posts from a specific subreddit."""
         posts = []
-        for submission in self.reddit.subreddit(subreddit).new(limit=100):
-            created_utc = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
-            if created_utc > since_datetime:
-                post_data = {
-                    "id": submission.id,
-                    "title": submission.title,
-                    "url": submission.url,
-                    "created_utc": created_utc,
-                    "permalink": f"https://reddit.com{submission.permalink}",
-                    "subreddit": subreddit,
-                    "score": submission.score
-                }
-                posts.append(post_data)
+        try:
+            for submission in self.reddit.subreddit(subreddit).new(limit=100):
+                created_utc = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
+                if created_utc > since_datetime:
+                    post_data = {
+                        "id": submission.id,
+                        "title": submission.title,
+                        "url": submission.url,
+                        "created_utc": created_utc,
+                        "permalink": f"https://reddit.com{submission.permalink}",
+                        "subreddit": subreddit,
+                        "score": submission.score
+                    }
+                    posts.append(post_data)
+        except praw.exceptions.RedditException as e:
+            logging.error(f"Reddit API error for subreddit '{subreddit}': {e}")
+        except Exception as e:
+            logging.error(f"Unexpected error fetching from subreddit '{subreddit}': {e}")
+        
         return posts

@@ -66,6 +66,7 @@ class TestYouTubeClient:
         mock_request.execute.return_value = {
             "items": [
                 {
+                    "id": "UC123",
                     "snippet": {
                         "title": "TechChannel"
                     }
@@ -128,6 +129,7 @@ class TestYouTubeClient:
         mock_request.execute.return_value = {
             "items": [
                 {
+                    "id": "UC123",
                     "snippet": {
                         "title": "TechChannel"
                     }
@@ -218,13 +220,25 @@ class TestYouTubeClient:
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
         
-        # Mock channel name lookup for both channels
+        # Mock channel name lookup for both channels (now supports batch calls)
         def mock_channel_response(**kwargs):
-            channel_id = kwargs.get('id')
-            if channel_id == "UC123":
-                return Mock(execute=lambda: {"items": [{"snippet": {"title": "TechChannel"}}]})
-            elif channel_id == "UC456":
-                return Mock(execute=lambda: {"items": [{"snippet": {"title": "EduChannel"}}]})
+            channel_ids = kwargs.get('id', '')
+            if ',' in channel_ids:
+                # Batch call
+                ids = channel_ids.split(',')
+                items = []
+                for cid in ids:
+                    if cid == "UC123":
+                        items.append({"id": "UC123", "snippet": {"title": "TechChannel"}})
+                    elif cid == "UC456":
+                        items.append({"id": "UC456", "snippet": {"title": "EduChannel"}})
+                return Mock(execute=lambda: {"items": items})
+            else:
+                # Single call
+                if channel_ids == "UC123":
+                    return Mock(execute=lambda: {"items": [{"id": "UC123", "snippet": {"title": "TechChannel"}}]})
+                elif channel_ids == "UC456":
+                    return Mock(execute=lambda: {"items": [{"id": "UC456", "snippet": {"title": "EduChannel"}}]})
             return Mock(execute=lambda: {"items": []})
         
         mock_youtube.channels.return_value.list.side_effect = mock_channel_response
@@ -284,7 +298,7 @@ class TestYouTubeClient:
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
         mock_request.execute.return_value = {
-            "items": [{"snippet": {"title": "TechChannel"}}]
+            "items": [{"id": "UC123", "snippet": {"title": "TechChannel"}}]
         }
         
         client = YouTubeClient(self.config)

@@ -1,4 +1,3 @@
-import os
 import logging
 from logging.handlers import RotatingFileHandler
 import yaml
@@ -21,34 +20,94 @@ logging.basicConfig(
 )
 
 def load_config(filename='config/config.yaml'):
-    with open(filename, 'r') as file:
-        return yaml.safe_load(file)
+    try:
+        with open(filename, 'r') as file:
+            config = yaml.safe_load(file)
+            validate_config(config)
+            return config
+    except FileNotFoundError:
+        logging.error(f"Configuration file not found: {filename}")
+        raise
+    except yaml.YAMLError as e:
+        logging.error(f"Invalid YAML in configuration file: {e}")
+        raise
+
+def validate_config(config):
+    """Validate configuration structure and required fields."""
+    if not isinstance(config, dict):
+        raise ValueError("Configuration must be a dictionary")
+    
+    # Validate Reddit configuration if enabled
+    reddit_config = config.get('reddit', {})
+    if reddit_config.get('enabled', False):
+        required_reddit_fields = ['client_id', 'client_secret', 'user_agent']
+        for field in required_reddit_fields:
+            if not reddit_config.get(field):
+                raise ValueError(f"Reddit configuration missing required field: {field}")
+        
+        # Validate Reddit has either subreddits or categories
+        if not reddit_config.get('subreddits') and not reddit_config.get('categories'):
+            raise ValueError("Reddit configuration must specify either 'subreddits' or 'categories'")
+    
+    # Validate YouTube configuration if enabled
+    youtube_config = config.get('youtube', {})
+    if youtube_config.get('enabled', False):
+        if not youtube_config.get('api_key'):
+            raise ValueError("YouTube configuration missing required field: api_key")
+        
+        # Validate YouTube has either channels or categories
+        if not youtube_config.get('channels') and not youtube_config.get('categories'):
+            raise ValueError("YouTube configuration must specify either 'channels' or 'categories'")
+    
+    # Validate SMTP configuration if enabled
+    smtp_config = config.get('smtp', {})
+    if smtp_config.get('enabled', False):
+        required_smtp_fields = ['server', 'port', 'username', 'password', 'from', 'to']
+        for field in required_smtp_fields:
+            if not smtp_config.get(field):
+                raise ValueError(f"SMTP configuration missing required field: {field}")
+        
+        # Validate port is a number
+        try:
+            int(smtp_config['port'])
+        except (ValueError, TypeError):
+            raise ValueError("SMTP port must be a valid integer")
+        
+        # Validate 'to' is a list
+        if not isinstance(smtp_config['to'], list):
+            raise ValueError("SMTP 'to' field must be a list of email addresses")
+    
+    logging.info("Configuration validation passed")
 
 def process_source(source_name, client_class, config, db_conn):
     items = []
     if config.get(source_name, {}).get("enabled"):
-        logging.info(f"{source_name.capitalize()} integration is enabled.")
-        client = client_class(config[source_name])
-        last_checked = get_last_checked(db_conn, source_name)
-        if last_checked:
-            last_checked = datetime.fromisoformat(last_checked)
-            if last_checked.tzinfo is None:
-                last_checked = last_checked.replace(tzinfo=timezone.utc)
-        else:
-            last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
-            logging.info(f"No previous check found, using last 72 hours as initial window for {source_name}.")
-        logging.info(f"Last checked time for {source_name.capitalize()}: {last_checked}")
+        try:
+            logging.info(f"{source_name.capitalize()} integration is enabled.")
+            client = client_class(config[source_name])
+            last_checked = get_last_checked(db_conn, source_name)
+            if last_checked:
+                last_checked = datetime.fromisoformat(last_checked)
+                if last_checked.tzinfo is None:
+                    last_checked = last_checked.replace(tzinfo=timezone.utc)
+            else:
+                last_checked = datetime.now(timezone.utc) - timedelta(hours=72)
+                logging.info(f"No previous check found, using last 72 hours as initial window for {source_name}.")
+            logging.info(f"Last checked time for {source_name.capitalize()}: {last_checked}")
 
-        new_items = client.get_new_items_since(last_checked)
-        item_type = f"{source_name.capitalize()} items"
+            new_items = client.get_new_items_since(last_checked)
+            item_type = f"{source_name.capitalize()} items"
 
-        logging.info(f"Found {len(new_items)} new {item_type} since last checked.")
-        for item in new_items:
-            logging.debug(f"New {source_name} item: {item['title']} (ID: {item['id']})")
+            logging.info(f"Found {len(new_items)} new {item_type} since last checked.")
+            for item in new_items:
+                logging.debug(f"New {source_name} item: {item['title']} (ID: {item['id']})")
 
-        update_last_checked(db_conn, source_name, datetime.now(timezone.utc))
-        logging.info(f"Updated last checked time for {source_name.capitalize()} in the database.")
-        items = new_items
+            update_last_checked(db_conn, source_name, datetime.now(timezone.utc))
+            logging.info(f"Updated last checked time for {source_name.capitalize()} in the database.")
+            items = new_items
+        except Exception as e:
+            logging.error(f"Error processing {source_name}: {e}")
+            return []
     return items
 
 def load_smtp_settings(config):

@@ -79,8 +79,26 @@ Plan to implement 4 code quality improvements, one at a time with separate commi
 - [ ] Update tests to work with new database abstraction
 - [ ] Commit: "refactor: extract database abstraction"
 
+## 5. Critical Performance & Reliability Fixes ⚡
+**Status**: High Priority  
+**Problem**: Analysis revealed critical gaps in error handling, API efficiency, and reliability  
+**Solution**: Implement essential fixes for production readiness  
+
+**Implementation Plan**:
+- [ ] Remove unused `import os` in main.py
+- [ ] Add basic error handling to all API operations with try/catch blocks
+- [ ] Implement configuration validation (move from #3 above to high priority)
+- [ ] Fix YouTube N+1 problem by batching channel name API calls
+- [ ] Add database context manager to prevent connection leaks
+- [ ] Replace string concatenation with list joining in email formatting
+- [ ] Add SMTP retry logic with exponential backoff
+- [ ] Add environment variable support for configuration overrides
+- [ ] Create unit tests for Reddit client (currently missing)
+- [ ] Commit each fix separately: "fix: [specific improvement]"
+
 ## Notes
 - Each improvement should be implemented and committed separately
 - Run full test suite after each change to ensure no regressions
 - Maintain backward compatibility throughout
 - Focus on keeping code concise and readable
+- Priority order: #5 (Critical fixes) → #2 (Email formatting) → #4 (Database) → #3 (Config validation)

@@ -26,12 +26,22 @@ class BaseMediaClient(ABC):
         """Fetch items from a specific source (subreddit/channel). Override in subclasses."""
         pass
     
+    def _pre_fetch_optimization(self, items):
+        """
+        Optional optimization hook for batch operations before fetching items.
+        Override in subclasses to implement batch fetching.
+        """
+        pass
+    
     def get_new_items_since(self, since_datetime):
         """
         Retrieve new items since the given datetime.
         Returns a list of dicts with item info, including category if categorized.
         """
         new_items = []
+        
+        # Allow subclasses to optimize with batch operations
+        self._pre_fetch_optimization(self.items)
         
         # Create a mapping from item to category if using categories
         item_to_category = {}
