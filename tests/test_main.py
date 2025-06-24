@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 
-from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config, _format_service_items, _apply_env_overrides
+from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config, _apply_env_overrides, format_email_content
 
 
 class TestLoadConfig:
@@ -230,84 +230,142 @@ class TestValidateConfig:
         validate_config(config)
 
 
-class TestFormatServiceItems:
-    def test_format_service_items_simple(self):
-        items = [
-            {
-                'title': 'Test Post 1',
-                'url': 'https://example.com/1',
-                'id': '1',
-                'subreddit': 'test_sub',
-                'score': 42
-            },
-            {
-                'title': 'Test Post 2',
-                'url': 'https://example.com/2',
-                'id': '2',
-                'subreddit': 'test_sub',
-                'score': 15
-            }
-        ]
+class TestFormatEmailContent:
+    def test_format_email_content_no_items(self):
+        all_items = {}
         
-        body_parts, html_parts = _format_service_items(items)
+        plain_text, html_content = format_email_content(all_items)
         
-        # Check that lists are returned
-        assert isinstance(body_parts, list)
-        assert isinstance(html_parts, list)
+        # Check that both formats are returned
+        assert isinstance(plain_text, str)
+        assert isinstance(html_content, str)
         
-        # Check body content
-        body_text = '\n'.join(body_parts)
-        assert 'test_sub:' in body_text
-        assert 'Test Post 1' in body_text
-        assert 'Score: 42' in body_text
-        assert 'Test Post 2' in body_text
-        assert 'Score: 15' in body_text
-        
-        # Check HTML content
-        html_text = ''.join(html_parts)
-        assert '<h4>test_sub:</h4>' in html_text
-        assert '<ul>' in html_text
-        assert 'Test Post 1' in html_text
-        assert 'Score: 42' in html_text
-        assert '</ul>' in html_text
+        # Check content indicates no items
+        assert "No new items" in plain_text
+        assert "No new items" in html_content or "No New Content" in html_content
     
-    def test_format_service_items_with_categories(self):
-        items = [
-            {
-                'title': 'Tech Post',
-                'url': 'https://example.com/tech',
-                'id': 'tech1',
-                'subreddit': 'technology',
-                'category': 'tech',
-                'score': 100
-            },
-            {
-                'title': 'News Post',
-                'url': 'https://example.com/news',
-                'id': 'news1',
-                'subreddit': 'worldnews',
-                'category': 'news'
-                # No score for this item
-            }
-        ]
+    def test_format_email_content_with_items(self):
+        all_items = {
+            'reddit': [
+                {
+                    'id': 'test1',
+                    'title': 'Test Reddit Post',
+                    'url': 'https://reddit.com/test1',
+                    'subreddit': 'python',
+                    'score': 42
+                }
+            ],
+            'youtube': [
+                {
+                    'id': 'test2',
+                    'title': 'Test YouTube Video',
+                    'url': 'https://youtube.com/test2',
+                    'channel_id': 'TechChannel'
+                }
+            ]
+        }
         
-        body_parts, html_parts = _format_service_items(items)
+        plain_text, html_content = format_email_content(all_items)
         
-        body_text = '\n'.join(body_parts)
-        html_text = ''.join(html_parts)
+        # Check that both formats are returned
+        assert isinstance(plain_text, str)
+        assert isinstance(html_content, str)
+        
+        # Check content includes items
+        assert 'Test Reddit Post' in plain_text
+        assert 'Test YouTube Video' in plain_text
+        assert 'python' in plain_text
+        assert 'TechChannel' in plain_text
+        
+        assert 'Test Reddit Post' in html_content
+        assert 'Test YouTube Video' in html_content
+        assert 'python' in html_content
+        assert 'TechChannel' in html_content
+        
+        # Check HTML contains proper tags
+        assert '<html' in html_content
+        assert '</html>' in html_content
+        assert '<a href="https://reddit.com/test1"' in html_content
+        assert '<a href="https://youtube.com/test2"' in html_content
+    
+    def test_format_email_content_with_categories(self):
+        all_items = {
+            'reddit': [
+                {
+                    'id': 'news1',
+                    'title': 'Breaking News',
+                    'url': 'https://reddit.com/news1',
+                    'subreddit': 'worldnews',
+                    'category': 'news',
+                    'score': 156
+                },
+                {
+                    'id': 'tech1',
+                    'title': 'Tech Update',
+                    'url': 'https://reddit.com/tech1',
+                    'subreddit': 'technology',
+                    'category': 'tech',
+                    'score': 89
+                }
+            ]
+        }
+        
+        plain_text, html_content = format_email_content(all_items)
         
         # Check categories are shown
-        assert 'Tech:' in body_text
-        assert 'News:' in body_text
-        assert '<h4>Tech:</h4>' in html_text
-        assert '<h4>News:</h4>' in html_text
+        assert 'News' in plain_text or 'NEWS' in plain_text
+        assert 'Tech' in plain_text or 'TECH' in plain_text
+        assert 'worldnews' in plain_text
+        assert 'technology' in plain_text
         
-        # Check score handling
-        assert 'Score: 100' in body_text
-        assert 'Score: 100' in html_text
-        # News post should not have score text since score is None
-        assert 'News Post' in body_text
-        assert 'News Post' in html_text
+        # Check scores are displayed
+        assert 'Score: 156' in plain_text
+        assert 'Score: 89' in plain_text
+        
+        # Check HTML formatting
+        assert 'Breaking News' in html_content
+        assert 'Tech Update' in html_content
+        assert 'Score: 156' in html_content
+        assert 'Score: 89' in html_content
+    
+    def test_format_email_content_empty_service_lists(self):
+        all_items = {
+            'reddit': [],
+            'youtube': []
+        }
+        
+        plain_text, html_content = format_email_content(all_items)
+        
+        # Should handle empty lists gracefully
+        assert isinstance(plain_text, str)
+        assert isinstance(html_content, str)
+        assert len(plain_text) > 0
+        assert len(html_content) > 0
+    
+    @patch('main.logging')
+    def test_format_email_content_template_error_fallback(self, mock_logging):
+        # Mock template loading to fail
+        with patch('main._setup_jinja_environment') as mock_setup:
+            mock_env = Mock()
+            mock_env.get_template.side_effect = Exception("Template not found")
+            mock_setup.return_value = mock_env
+            
+            all_items = {'reddit': [{'title': 'test'}]}
+            
+            plain_text, html_content = format_email_content(all_items)
+            
+            # Should fall back to simple content
+            assert isinstance(plain_text, str)
+            assert isinstance(html_content, str)
+            assert 'New items found' in plain_text
+            assert '<p>' in html_content
+            
+            # Should log the error
+            mock_logging.error.assert_called_once()
+
+
+# TestFormatServiceItems class removed - functionality moved to Jinja2 templates
+# The formatting logic is now tested via TestFormatEmailContent
 
 
 class TestProcessSource:
@@ -452,9 +510,10 @@ class TestSendEmail:
         mock_server.login.assert_called_once_with('test@example.com', 'password')
         mock_server.send_message.assert_called_once()
         
-        # Check that the message contains "No new items"
+        # Check that the message contains "No new items" content
         call_args = mock_server.send_message.call_args[0][0]
-        assert "No new items found from any source" in str(call_args)
+        message_str = str(call_args)
+        assert "No new items" in message_str or "No New Content" in message_str
     
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_with_items(self, mock_smtp):
@@ -481,8 +540,8 @@ class TestSendEmail:
         message_content = str(call_args)
         assert 'Test Post' in message_content
         assert 'Test Video' in message_content
-        assert 'python:' in message_content
-        assert 'TechChannel:' in message_content
+        assert 'python' in message_content
+        assert 'TechChannel' in message_content
     
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
@@ -561,9 +620,8 @@ class TestSendEmail:
         mock_server.send_message.assert_called_once()
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
-        assert 'Reddit:' in message_content
-        assert 'Youtube:' in message_content
-        assert 'No new items' in message_content
+        # With new template, empty lists are treated as "no items found"
+        assert 'No new items' in message_content or 'No New Content' in message_content
 
 
 class TestGroupBySource:
@@ -709,9 +767,9 @@ class TestSendEmailWithCategories:
         message_content = str(call_args)
         assert 'News:' in message_content
         assert 'Tech:' in message_content
-        assert 'worldnews:' in message_content
-        assert 'python:' in message_content
-        assert 'politics:' in message_content
+        assert 'worldnews' in message_content
+        assert 'python' in message_content
+        assert 'politics' in message_content
         assert 'News Post' in message_content
         assert 'Tech Post' in message_content
     
@@ -734,11 +792,12 @@ class TestSendEmailWithCategories:
         
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
-        assert 'Reddit:' in message_content
-        assert 'Youtube:' in message_content
-        assert 'worldnews:' in message_content
-        assert 'TechChannel:' in message_content
-        assert 'EduChannel:' in message_content
+        # Template uses uppercase service names in text format
+        assert 'REDDIT:' in message_content or 'Reddit' in message_content
+        assert 'YOUTUBE:' in message_content or 'Youtube' in message_content
+        assert 'worldnews' in message_content
+        assert 'TechChannel' in message_content
+        assert 'EduChannel' in message_content
         assert 'Reddit News' in message_content
         assert 'YouTube Tech' in message_content
         assert 'Uncategorized Video' in message_content

@@ -1,0 +1,46 @@
+MEDIA MONITOR REPORT
+{{ "=" * 50 }}
+
+{% if has_items %}
+New items found since your last check:
+
+{% for service_name, service_items in services.items() %}
+{{ service_name|upper }}:
+{{ "-" * (service_name|length + 1) }}
+
+{% if service_items %}
+{% set grouped_items = service_items | group_by_category_and_source %}
+{% for category, sources in grouped_items.items() %}
+{% if grouped_items|length > 1 and category != 'uncategorized' %}
+  {{ category|title }}:
+{% endif %}
+{% for source, items in sources.items() %}
+{% if grouped_items|length > 1 and category != 'uncategorized' %}
+    {{ source }}:
+{% else %}
+  {{ source }}:
+{% endif %}
+{% for item in items %}
+{% if grouped_items|length > 1 and category != 'uncategorized' %}
+      - {{ item.title }} (ID: {{ item.id }}){% if item.score is not none %} (Score: {{ item.score }}){% endif %}
+{% else %}
+    - {{ item.title }} (ID: {{ item.id }}){% if item.score is not none %} (Score: {{ item.score }}){% endif %}
+{% endif %}
+{% endfor %}
+
+{% endfor %}
+{% if grouped_items|length > 1 and category != 'uncategorized' %}
+
+{% endif %}
+{% endfor %}
+{% else %}
+No new items found for {{ service_name }}.
+
+{% endif %}
+{% endfor %}
+{% else %}
+No new items were found from any of your monitored sources.
+{% endif %}
+
+Generated on {{ timestamp.strftime('%B %d, %Y at %I:%M %p') }}
+Media Monitor - Keeping you updated with the latest content

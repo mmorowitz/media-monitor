@@ -9,6 +9,7 @@ from src.reddit_client import RedditClient
 from src.youtube_client import YouTubeClient
 import smtplib
 from email.message import EmailMessage
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 log_handler = RotatingFileHandler(
     'logs/app.log', maxBytes=5*1024*1024, backupCount=5  # 5 MB per file, keep 5 backups
@@ -204,86 +205,73 @@ def group_by_source(items):
         grouped[source].append(item)
     return grouped
 
-def _format_service_items(items):
-    """Format items for a single service into body and HTML parts."""
-    body_parts = []
-    html_parts = []
+def _setup_jinja_environment():
+    """Set up Jinja2 environment with custom filters."""
+    env = Environment(
+        loader=FileSystemLoader('templates'),
+        autoescape=select_autoescape(['html', 'xml'])
+    )
     
-    # Group items by category and source
-    grouped_items = group_items_by_category_and_source(items)
+    # Add custom filter for grouping items
+    env.filters['group_by_category_and_source'] = group_items_by_category_and_source
     
-    for category, sources in grouped_items.items():
-        # Only show category headers if there are multiple categories
-        if len(grouped_items) > 1 and category != 'uncategorized':
-            body_parts.append(f"  {category.capitalize()}:")
-            html_parts.append(f"<h4>{category.capitalize()}:</h4>")
+    return env
+
+def format_email_content(all_items):
+    """Format email content using Jinja2 templates.
+    
+    Returns:
+        tuple: (plain_text_body, html_body)
+    """
+    # Set up Jinja2 environment
+    env = _setup_jinja_environment()
+    
+    # Prepare template context
+    has_items = any(items for items in all_items.values())
+    
+    context = {
+        'services': all_items,
+        'has_items': has_items,
+        'timestamp': datetime.now(timezone.utc)
+    }
+    
+    # Render templates
+    try:
+        text_template = env.get_template('email_template.txt')
+        html_template = env.get_template('email_template.html')
         
-        for source, source_items in sources.items():
-            # Add source header
-            if len(grouped_items) > 1 and category != 'uncategorized':
-                body_parts.append(f"    {source}:")
-                html_parts.append(f"<h5>{source}:</h5>")
-            else:
-                body_parts.append(f"  {source}:")
-                html_parts.append(f"<h4>{source}:</h4>")
-            
-            # Format individual items
-            item_html_parts = ["<ul>"]
-            for item in source_items:
-                title = item.get('title', 'No Title')
-                url = item.get('url', '#')
-                item_id = item.get('id', 'N/A')
-                score = item.get('score')
-                score_text = f" (Score: {score})" if score is not None else ""
-                
-                # Choose indentation based on category structure
-                indent = "      " if len(grouped_items) > 1 and category != 'uncategorized' else "    "
-                body_parts.append(f"{indent}- {title} (ID: {item_id}){score_text}")
-                item_html_parts.append(f'<li><a href="{url}">{title}</a> (ID: {item_id}){score_text}</li>')
-            
-            item_html_parts.append("</ul>")
-            html_parts.extend(item_html_parts)
+        plain_text = text_template.render(context)
+        html_content = html_template.render(context)
         
-        # Add spacing between categories
-        if len(grouped_items) > 1:
-            body_parts.append("")
-    
-    return body_parts, html_parts
+        return plain_text, html_content
+        
+    except Exception as e:
+        logging.error(f"Error rendering email templates: {e}")
+        # Fallback to simple content
+        if has_items:
+            fallback_text = f"New items found from {len(all_items)} services. Check the application logs for details."
+            fallback_html = f"<p>{fallback_text}</p>"
+        else:
+            fallback_text = "No new items found from any source."
+            fallback_html = f"<p>{fallback_text}</p>"
+        
+        return fallback_text, fallback_html
 
 def send_email(smtp_cfg, all_items):
+    """Send email notification with formatted content using Jinja2 templates."""
     msg = EmailMessage()
     msg["Subject"] = "Media Monitor Report"
     msg["From"] = smtp_cfg["from"]
     msg["To"] = ", ".join(smtp_cfg["to"])
 
-    if not all_items:
-        body = "No new items found from any source."
-        html_body = "<p>No new items found from any source.</p>"
-    else:
-        # Use lists for efficient string building
-        body_parts = ["New items found:\n"]
-        html_parts = ["<h2>New items found:</h2>"]
-        
-        for service, items in all_items.items():
-            body_parts.append(f"{service.capitalize()}:")
-            html_parts.append(f"<h3>{service.capitalize()}:</h3>")
-            
-            if items:
-                service_body_parts, service_html_parts = _format_service_items(items)
-                body_parts.extend(service_body_parts)
-                html_parts.extend(service_html_parts)
-            else:
-                body_parts.append("No new items.")
-                html_parts.append("<p>No new items.</p>")
-            
-            body_parts.append("")  # Add blank line between services
-        
-        body = "\n".join(body_parts)
-        html_body = "".join(html_parts)
+    # Generate email content using templates
+    plain_text, html_content = format_email_content(all_items)
+    
+    # Set message content
+    msg.set_content(plain_text)
+    msg.add_alternative(html_content, subtype='html')
 
-    msg.set_content(body)
-    msg.add_alternative(html_body, subtype='html')
-
+    # Send email with retry logic
     _send_email_with_retry(smtp_cfg, msg)
 
 def _send_email_with_retry(smtp_cfg, msg, max_retries=3, base_delay=1.0):
