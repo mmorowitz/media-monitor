@@ -156,6 +156,52 @@ def group_by_source(items):
         grouped[source].append(item)
     return grouped
 
+def _format_service_items(items):
+    """Format items for a single service into body and HTML parts."""
+    body_parts = []
+    html_parts = []
+    
+    # Group items by category and source
+    grouped_items = group_items_by_category_and_source(items)
+    
+    for category, sources in grouped_items.items():
+        # Only show category headers if there are multiple categories
+        if len(grouped_items) > 1 and category != 'uncategorized':
+            body_parts.append(f"  {category.capitalize()}:")
+            html_parts.append(f"<h4>{category.capitalize()}:</h4>")
+        
+        for source, source_items in sources.items():
+            # Add source header
+            if len(grouped_items) > 1 and category != 'uncategorized':
+                body_parts.append(f"    {source}:")
+                html_parts.append(f"<h5>{source}:</h5>")
+            else:
+                body_parts.append(f"  {source}:")
+                html_parts.append(f"<h4>{source}:</h4>")
+            
+            # Format individual items
+            item_html_parts = ["<ul>"]
+            for item in source_items:
+                title = item.get('title', 'No Title')
+                url = item.get('url', '#')
+                item_id = item.get('id', 'N/A')
+                score = item.get('score')
+                score_text = f" (Score: {score})" if score is not None else ""
+                
+                # Choose indentation based on category structure
+                indent = "      " if len(grouped_items) > 1 and category != 'uncategorized' else "    "
+                body_parts.append(f"{indent}- {title} (ID: {item_id}){score_text}")
+                item_html_parts.append(f'<li><a href="{url}">{title}</a> (ID: {item_id}){score_text}</li>')
+            
+            item_html_parts.append("</ul>")
+            html_parts.extend(item_html_parts)
+        
+        # Add spacing between categories
+        if len(grouped_items) > 1:
+            body_parts.append("")
+    
+    return body_parts, html_parts
+
 def send_email(smtp_cfg, all_items):
     msg = EmailMessage()
     msg["Subject"] = "Media Monitor Report"
@@ -166,51 +212,26 @@ def send_email(smtp_cfg, all_items):
         body = "No new items found from any source."
         html_body = "<p>No new items found from any source.</p>"
     else:
-        body = "New items found:\n\n"
-        html_body = "<h2>New items found:</h2>"
+        # Use lists for efficient string building
+        body_parts = ["New items found:\n"]
+        html_parts = ["<h2>New items found:</h2>"]
+        
         for service, items in all_items.items():
-            body += f"{service.capitalize()}:\n"
-            html_body += f"<h3>{service.capitalize()}:</h3>"
+            body_parts.append(f"{service.capitalize()}:")
+            html_parts.append(f"<h3>{service.capitalize()}:</h3>")
             
             if items:
-                # Group items by category and source
-                grouped_items = group_items_by_category_and_source(items)
-                
-                for category, sources in grouped_items.items():
-                    # Only show category headers if there are multiple categories
-                    if len(grouped_items) > 1 and category != 'uncategorized':
-                        body += f"  {category.capitalize()}:\n"
-                        html_body += f"<h4>{category.capitalize()}:</h4>"
-                    
-                    for source, source_items in sources.items():
-                        # Add source header
-                        if len(grouped_items) > 1 and category != 'uncategorized':
-                            body += f"    {source}:\n"
-                            html_body += f"<h5>{source}:</h5>"
-                        else:
-                            body += f"  {source}:\n"
-                            html_body += f"<h4>{source}:</h4>"
-                        
-                        html_body += "<ul>"
-                        for item in source_items:
-                            title = item.get('title', 'No Title')
-                            url = item.get('url', '#')
-                            item_id = item.get('id', 'N/A')
-                            score = item.get('score')
-                            score_text = f" (Score: {score})" if score is not None else ""
-                            if len(grouped_items) > 1 and category != 'uncategorized':
-                                body += f"      - {title} (ID: {item_id}){score_text}\n"
-                            else:
-                                body += f"    - {title} (ID: {item_id}){score_text}\n"
-                            html_body += f'<li><a href="{url}">{title}</a> (ID: {item_id}){score_text}</li>'
-                        html_body += "</ul>"
-                    
-                    if len(grouped_items) > 1:
-                        body += "\n"
+                service_body_parts, service_html_parts = _format_service_items(items)
+                body_parts.extend(service_body_parts)
+                html_parts.extend(service_html_parts)
             else:
-                body += "No new items.\n"
-                html_body += "<p>No new items.</p>"
-            body += "\n"
+                body_parts.append("No new items.")
+                html_parts.append("<p>No new items.</p>")
+            
+            body_parts.append("")  # Add blank line between services
+        
+        body = "\n".join(body_parts)
+        html_body = "".join(html_parts)
 
     msg.set_content(body)
     msg.add_alternative(html_body, subtype='html')

@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch, mock_open
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 
-from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config
+from main import load_config, process_source, load_smtp_settings, send_email, group_items_by_category_and_source, group_by_source, validate_config, _format_service_items
 
 
 class TestLoadConfig:
@@ -124,6 +124,86 @@ class TestValidateConfig:
         }
         # Should not raise an exception for disabled services
         validate_config(config)
+
+
+class TestFormatServiceItems:
+    def test_format_service_items_simple(self):
+        items = [
+            {
+                'title': 'Test Post 1',
+                'url': 'https://example.com/1',
+                'id': '1',
+                'subreddit': 'test_sub',
+                'score': 42
+            },
+            {
+                'title': 'Test Post 2',
+                'url': 'https://example.com/2',
+                'id': '2',
+                'subreddit': 'test_sub',
+                'score': 15
+            }
+        ]
+        
+        body_parts, html_parts = _format_service_items(items)
+        
+        # Check that lists are returned
+        assert isinstance(body_parts, list)
+        assert isinstance(html_parts, list)
+        
+        # Check body content
+        body_text = '\n'.join(body_parts)
+        assert 'test_sub:' in body_text
+        assert 'Test Post 1' in body_text
+        assert 'Score: 42' in body_text
+        assert 'Test Post 2' in body_text
+        assert 'Score: 15' in body_text
+        
+        # Check HTML content
+        html_text = ''.join(html_parts)
+        assert '<h4>test_sub:</h4>' in html_text
+        assert '<ul>' in html_text
+        assert 'Test Post 1' in html_text
+        assert 'Score: 42' in html_text
+        assert '</ul>' in html_text
+    
+    def test_format_service_items_with_categories(self):
+        items = [
+            {
+                'title': 'Tech Post',
+                'url': 'https://example.com/tech',
+                'id': 'tech1',
+                'subreddit': 'technology',
+                'category': 'tech',
+                'score': 100
+            },
+            {
+                'title': 'News Post',
+                'url': 'https://example.com/news',
+                'id': 'news1',
+                'subreddit': 'worldnews',
+                'category': 'news'
+                # No score for this item
+            }
+        ]
+        
+        body_parts, html_parts = _format_service_items(items)
+        
+        body_text = '\n'.join(body_parts)
+        html_text = ''.join(html_parts)
+        
+        # Check categories are shown
+        assert 'Tech:' in body_text
+        assert 'News:' in body_text
+        assert '<h4>Tech:</h4>' in html_text
+        assert '<h4>News:</h4>' in html_text
+        
+        # Check score handling
+        assert 'Score: 100' in body_text
+        assert 'Score: 100' in html_text
+        # News post should not have score text since score is None
+        assert 'News Post' in body_text
+        assert 'News Post' in html_text
 
 
 class TestProcessSource:
