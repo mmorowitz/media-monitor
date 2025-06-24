@@ -182,7 +182,7 @@ class TestSendEmail:
                 {'id': '1', 'title': 'Test Post', 'url': 'https://reddit.com/1', 'subreddit': 'python'}
             ],
             'youtube': [
-                {'id': '2', 'title': 'Test Video', 'url': 'https://youtube.com/2', 'channel_id': 'UC123'}
+                {'id': '2', 'title': 'Test Video', 'url': 'https://youtube.com/2', 'channel_id': 'TechChannel'}
             ]
         }
         
@@ -198,7 +198,7 @@ class TestSendEmail:
         assert 'Test Post' in message_content
         assert 'Test Video' in message_content
         assert 'python:' in message_content
-        assert 'UC123:' in message_content
+        assert 'TechChannel:' in message_content
     
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
@@ -254,15 +254,15 @@ class TestGroupBySource:
     
     def test_group_by_source_youtube(self):
         items = [
-            {'id': '1', 'title': 'Video 1', 'channel_id': 'UC123'},
-            {'id': '2', 'title': 'Video 2', 'channel_id': 'UC456'}
+            {'id': '1', 'title': 'Video 1', 'channel_id': 'TechChannel'},
+            {'id': '2', 'title': 'Video 2', 'channel_id': 'EduChannel'}
         ]
         
         result = group_by_source(items)
         
         expected = {
-            'UC123': [{'id': '1', 'title': 'Video 1', 'channel_id': 'UC123'}],
-            'UC456': [{'id': '2', 'title': 'Video 2', 'channel_id': 'UC456'}]
+            'TechChannel': [{'id': '1', 'title': 'Video 1', 'channel_id': 'TechChannel'}],
+            'EduChannel': [{'id': '2', 'title': 'Video 2', 'channel_id': 'EduChannel'}]
         }
         assert result == expected
     
@@ -390,8 +390,8 @@ class TestSendEmailWithCategories:
                 {'id': '1', 'title': 'Reddit News', 'url': 'https://reddit.com/1', 'category': 'news', 'subreddit': 'worldnews'}
             ],
             'youtube': [
-                {'id': '2', 'title': 'YouTube Tech', 'url': 'https://youtube.com/2', 'category': 'tech', 'channel_id': 'UC123'},
-                {'id': '3', 'title': 'Uncategorized Video', 'url': 'https://youtube.com/3', 'channel_id': 'UC456'}
+                {'id': '2', 'title': 'YouTube Tech', 'url': 'https://youtube.com/2', 'category': 'tech', 'channel_id': 'TechChannel'},
+                {'id': '3', 'title': 'Uncategorized Video', 'url': 'https://youtube.com/3', 'channel_id': 'EduChannel'}
             ]
         }
         
@@ -402,8 +402,8 @@ class TestSendEmailWithCategories:
         assert 'Reddit:' in message_content
         assert 'Youtube:' in message_content
         assert 'worldnews:' in message_content
-        assert 'UC123:' in message_content
-        assert 'UC456:' in message_content
+        assert 'TechChannel:' in message_content
+        assert 'EduChannel:' in message_content
         assert 'Reddit News' in message_content
         assert 'YouTube Tech' in message_content
         assert 'Uncategorized Video' in message_content

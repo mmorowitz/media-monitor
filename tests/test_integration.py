@@ -149,11 +149,16 @@ class TestFullIntegration:
         # Verify structure of returned items
         if items:
             item = items[0]
-            required_fields = ['id', 'title', 'url', 'published_at']
+            required_fields = ['id', 'title', 'url', 'published_at', 'channel_id']
             for field in required_fields:
                 assert field in item, f"Missing field {field} in YouTube item"
             
             print(f"Sample item: {item['title'][:50]}...")
+            print(f"Channel: {item['channel_id']}")
+            
+            # Verify channel_id contains a human-readable name, not just an ID
+            channel_id = item['channel_id']
+            assert not channel_id.startswith('UC'), f"Channel ID should be human-readable name, got: {channel_id}"
             
             # Test with categories if configured
             if 'category' in item:
@@ -237,7 +242,7 @@ class TestFullIntegration:
                     'url': 'https://youtube.com/watch?v=test1',
                     'published_at': datetime.now(timezone.utc),
                     'category': 'test',
-                    'channel_id': 'UCtest123'
+                    'channel_id': 'Test Channel'
                 }
             ]
         }
