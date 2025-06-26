@@ -162,7 +162,8 @@ class TestYouTubeClient:
         assert video["id"] == "video123"
         assert video["title"] == "Test Video"
         assert video["url"] == "https://www.youtube.com/watch?v=video123"
-        assert video["channel_id"] == "TechChannel"  # Should use channel name, not ID
+        assert video["channel_id"] == "UC123"  # Should use actual channel ID
+        assert video["channel_name"] == "TechChannel"  # Should use channel name for display
         assert isinstance(video["published_at"], datetime)
         
         # Verify channel name was fetched
@@ -285,9 +286,11 @@ class TestYouTubeClient:
         assert tech_item["category"] == "tech"
         assert edu_item["category"] == "education"
         
-        # Verify channel names are used
-        assert tech_item["channel_id"] == "TechChannel"
-        assert edu_item["channel_id"] == "EduChannel"
+        # Verify channel IDs and names are used correctly
+        assert tech_item["channel_id"] == "UC123"
+        assert tech_item["channel_name"] == "TechChannel"
+        assert edu_item["channel_id"] == "UC456"
+        assert edu_item["channel_name"] == "EduChannel"
 
     @patch('src.youtube_client.build')
     def test_channel_name_caching_across_calls(self, mock_build):

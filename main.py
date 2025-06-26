@@ -199,7 +199,7 @@ def group_by_source(items):
     """Group items by their source (subreddit or channel_id)."""
     grouped = {}
     for item in items:
-        source = item.get('subreddit') or item.get('channel_id', 'unknown')
+        source = item.get('subreddit') or item.get('channel_name', 'unknown')
         if source not in grouped:
             grouped[source] = []
         grouped[source].append(item)

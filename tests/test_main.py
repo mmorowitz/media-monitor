@@ -647,15 +647,15 @@ class TestGroupBySource:
     
     def test_group_by_source_youtube(self):
         items = [
-            {'id': '1', 'title': 'Video 1', 'channel_id': 'TechChannel'},
-            {'id': '2', 'title': 'Video 2', 'channel_id': 'EduChannel'}
+            {'id': '1', 'title': 'Video 1', 'channel_id': 'UC123', 'channel_name': 'TechChannel'},
+            {'id': '2', 'title': 'Video 2', 'channel_id': 'UC456', 'channel_name': 'EduChannel'}
         ]
         
         result = group_by_source(items)
         
         expected = {
-            'TechChannel': [{'id': '1', 'title': 'Video 1', 'channel_id': 'TechChannel'}],
-            'EduChannel': [{'id': '2', 'title': 'Video 2', 'channel_id': 'EduChannel'}]
+            'TechChannel': [{'id': '1', 'title': 'Video 1', 'channel_id': 'UC123', 'channel_name': 'TechChannel'}],
+            'EduChannel': [{'id': '2', 'title': 'Video 2', 'channel_id': 'UC456', 'channel_name': 'EduChannel'}]
         }
         assert result == expected
     

@@ -16,9 +16,9 @@ New items found since your last check:
 {% endif %}
 {% for source, items in sources.items() %}
 {% if grouped_items|length > 1 and category != 'uncategorized' %}
-    {{ source }}:
+    {{ source }} ({% if items[0].subreddit %}https://reddit.com/r/{{ source }}{% else %}https://youtube.com/channel/{{ items[0].channel_id }}{% endif %}):
 {% else %}
-  {{ source }}:
+  {{ source }} ({% if items[0].subreddit %}https://reddit.com/r/{{ source }}{% else %}https://youtube.com/channel/{{ items[0].channel_id }}{% endif %}):
 {% endif %}
 {% for item in items %}
 {% if grouped_items|length > 1 and category != 'uncategorized' %}

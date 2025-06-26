@@ -112,7 +112,8 @@ class YouTubeClient(BaseMediaClient):
                         "title": item["snippet"]["title"],
                         "url": f"https://www.youtube.com/watch?v={item['id']['videoId']}",
                         "published_at": video_datetime,
-                        "channel_id": channel_name
+                        "channel_id": channel_id,
+                        "channel_name": channel_name
                     }
                     videos.append(video_data)
         except Exception as e:

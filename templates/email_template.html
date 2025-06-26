@@ -124,9 +124,9 @@
                             
                             {% for source, items in sources.items() %}
                                 {% if grouped_items|length > 1 and category != 'uncategorized' %}
-                                    <h5>{{ source }}</h5>
+                                    <h5><a href="{% if items[0].subreddit %}https://reddit.com/r/{{ source }}{% else %}https://youtube.com/channel/{{ items[0].channel_id }}{% endif %}" target="_blank">{{ source }}</a></h5>
                                 {% else %}
-                                    <h4>{{ source }}</h4>
+                                    <h4><a href="{% if items[0].subreddit %}https://reddit.com/r/{{ source }}{% else %}https://youtube.com/channel/{{ items[0].channel_id }}{% endif %}" target="_blank">{{ source }}</a></h4>
                                 {% endif %}
                                 
                                 <ul>
