@@ -72,11 +72,6 @@
             font-size: 0.9em;
             color: #7f8c8d;
         }
-        .item-id {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.8em;
-            color: #95a5a6;
-        }
         .no-items {
             font-style: italic;
             color: #7f8c8d;
@@ -138,7 +133,6 @@
                                     {% for item in items %}
                                         <li>
                                             <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
-                                            <span class="item-id">(ID: {{ item.id }})</span>
                                             {% if item.score is not none %}
                                                 <span class="score">Score: {{ item.score }}</span>
                                             {% endif %}

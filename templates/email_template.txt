@@ -22,9 +22,9 @@ New items found since your last check:
 {% endif %}
 {% for item in items %}
 {% if grouped_items|length > 1 and category != 'uncategorized' %}
-      - {{ item.title }} (ID: {{ item.id }}){% if item.score is not none %} (Score: {{ item.score }}){% endif %}
+      - {{ item.title }}{% if item.score is not none %} (Score: {{ item.score }}){% endif %}
 {% else %}
-    - {{ item.title }} (ID: {{ item.id }}){% if item.score is not none %} (Score: {{ item.score }}){% endif %}
+    - {{ item.title }}{% if item.score is not none %} (Score: {{ item.score }}){% endif %}
 {% endif %}
 {% endfor %}
 
