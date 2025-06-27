@@ -43,12 +43,29 @@ class RedditClient(BaseMediaClient):
             for submission in self.reddit.subreddit(subreddit).new(limit=100):
                 created_utc = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
                 if created_utc > since_datetime:
+                    reddit_url = f"https://reddit.com{submission.permalink}"
+                    
+                    # Determine post type and URLs
+                    if submission.is_self:
+                        # Self post - discussion only happens on Reddit
+                        post_type = "self"
+                        external_url = None
+                        primary_url = reddit_url
+                    else:
+                        # Link post - has external content
+                        post_type = "link"
+                        external_url = submission.url
+                        primary_url = submission.url
+                    
                     post_data = {
                         "id": submission.id,
                         "title": submission.title,
-                        "url": submission.url,
+                        "url": primary_url,  # Maintains backward compatibility
+                        "reddit_url": reddit_url,
+                        "external_url": external_url,
+                        "post_type": post_type,
                         "created_utc": created_utc,
-                        "permalink": f"https://reddit.com{submission.permalink}",
+                        "permalink": reddit_url,  # Backward compatibility
                         "subreddit": subreddit,
                         "score": submission.score
                     }

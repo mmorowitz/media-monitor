@@ -23,8 +23,20 @@ New items found since your last check:
 {% for item in items %}
 {% if grouped_items|length > 1 and category != 'uncategorized' %}
       - {{ item.title }}{% if item.score is not none %} (Score: {{ item.score }}){% endif %}
+{% if item.post_type == 'link' and item.external_url %}
+        Link: {{ item.external_url }}
+        Discussion: {{ item.reddit_url }}
+{% else %}
+        URL: {{ item.url }}
+{% endif %}
 {% else %}
     - {{ item.title }}{% if item.score is not none %} (Score: {{ item.score }}){% endif %}
+{% if item.post_type == 'link' and item.external_url %}
+      Link: {{ item.external_url }}
+      Discussion: {{ item.reddit_url }}
+{% else %}
+      URL: {{ item.url }}
+{% endif %}
 {% endif %}
 {% endfor %}
 

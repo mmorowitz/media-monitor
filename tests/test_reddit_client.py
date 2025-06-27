@@ -67,7 +67,7 @@ class TestRedditClient:
 
     @patch('src.reddit_client.praw.Reddit')
     def test_fetch_items_for_source_success(self, mock_reddit):
-        # Create mock submissions
+        # Create mock submissions - mix of link and self posts
         mock_submission1 = Mock()
         mock_submission1.id = "post1"
         mock_submission1.title = "Test Post 1"
@@ -75,14 +75,16 @@ class TestRedditClient:
         mock_submission1.created_utc = (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()
         mock_submission1.permalink = "/r/python/comments/post1/test_post_1/"
         mock_submission1.score = 42
+        mock_submission1.is_self = False  # Link post
         
         mock_submission2 = Mock()
         mock_submission2.id = "post2"
         mock_submission2.title = "Test Post 2"
-        mock_submission2.url = "https://example.com/2"
+        mock_submission2.url = "https://reddit.com/r/python/comments/post2/test_post_2/"
         mock_submission2.created_utc = (datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()
         mock_submission2.permalink = "/r/python/comments/post2/test_post_2/"
         mock_submission2.score = 15
+        mock_submission2.is_self = True  # Self post
         
         # Mock the Reddit API chain
         mock_reddit_instance = Mock()
@@ -98,25 +100,84 @@ class TestRedditClient:
         
         assert len(posts) == 2
         
-        # Check first post
+        # Check first post (link post)
         post1 = posts[0]
         assert post1["id"] == "post1"
         assert post1["title"] == "Test Post 1"
-        assert post1["url"] == "https://example.com/1"
+        assert post1["url"] == "https://example.com/1"  # Primary URL is external for link posts
+        assert post1["reddit_url"] == "https://reddit.com/r/python/comments/post1/test_post_1/"
+        assert post1["external_url"] == "https://example.com/1"
+        assert post1["post_type"] == "link"
         assert post1["permalink"] == "https://reddit.com/r/python/comments/post1/test_post_1/"
         assert post1["subreddit"] == "python"
         assert post1["score"] == 42
         assert isinstance(post1["created_utc"], datetime)
         
-        # Check second post
+        # Check second post (self post)
         post2 = posts[1]
         assert post2["id"] == "post2"
         assert post2["title"] == "Test Post 2"
+        assert post2["url"] == "https://reddit.com/r/python/comments/post2/test_post_2/"  # Primary URL is Reddit for self posts
+        assert post2["reddit_url"] == "https://reddit.com/r/python/comments/post2/test_post_2/"
+        assert post2["external_url"] is None
+        assert post2["post_type"] == "self"
         assert post2["score"] == 15
         
         # Verify API calls
         mock_reddit_instance.subreddit.assert_called_with("python")
         mock_subreddit.new.assert_called_with(limit=100)
+
+    @patch('src.reddit_client.praw.Reddit')
+    def test_post_type_detection(self, mock_reddit):
+        """Test that post type detection works correctly for link vs self posts."""
+        # Link post
+        mock_link_post = Mock()
+        mock_link_post.id = "link1"
+        mock_link_post.title = "External Link"
+        mock_link_post.url = "https://example.com/article"
+        mock_link_post.created_utc = (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()
+        mock_link_post.permalink = "/r/test/comments/link1/"
+        mock_link_post.score = 10
+        mock_link_post.is_self = False
+        
+        # Self post
+        mock_self_post = Mock()
+        mock_self_post.id = "self1"
+        mock_self_post.title = "Discussion Post"
+        mock_self_post.url = "https://reddit.com/r/test/comments/self1/"
+        mock_self_post.created_utc = (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()
+        mock_self_post.permalink = "/r/test/comments/self1/"
+        mock_self_post.score = 5
+        mock_self_post.is_self = True
+        
+        # Mock Reddit API
+        mock_reddit_instance = Mock()
+        mock_subreddit = Mock()
+        mock_subreddit.new.return_value = [mock_link_post, mock_self_post]
+        mock_reddit_instance.subreddit.return_value = mock_subreddit
+        mock_reddit.return_value = mock_reddit_instance
+        
+        client = RedditClient(self.config)
+        since_datetime = datetime.now(timezone.utc) - timedelta(hours=2)
+        posts = client._fetch_items_for_source("test", since_datetime)
+        
+        assert len(posts) == 2
+        
+        # Find posts by ID
+        link_post = next(p for p in posts if p["id"] == "link1")
+        self_post = next(p for p in posts if p["id"] == "self1")
+        
+        # Verify link post structure
+        assert link_post["post_type"] == "link"
+        assert link_post["external_url"] == "https://example.com/article"
+        assert link_post["reddit_url"] == "https://reddit.com/r/test/comments/link1/"
+        assert link_post["url"] == "https://example.com/article"  # Primary URL is external
+        
+        # Verify self post structure
+        assert self_post["post_type"] == "self"
+        assert self_post["external_url"] is None
+        assert self_post["reddit_url"] == "https://reddit.com/r/test/comments/self1/"
+        assert self_post["url"] == "https://reddit.com/r/test/comments/self1/"  # Primary URL is Reddit
 
     @patch('src.reddit_client.praw.Reddit')
     def test_fetch_items_for_source_filters_old_posts(self, mock_reddit):

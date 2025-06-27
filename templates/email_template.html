@@ -132,7 +132,12 @@
                                 <ul>
                                     {% for item in items %}
                                         <li>
-                                            <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
+                                            {% if item.post_type == 'link' and item.external_url %}
+                                                <a href="{{ item.external_url }}" target="_blank">{{ item.title }}</a>
+                                                <br><small>📄 <a href="{{ item.reddit_url }}" target="_blank">Discussion</a></small>
+                                            {% else %}
+                                                <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
+                                            {% endif %}
                                             {% if item.score is not none %}
                                                 <span class="score">Score: {{ item.score }}</span>
                                             {% endif %}
