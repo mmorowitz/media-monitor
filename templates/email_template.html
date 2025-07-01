@@ -138,7 +138,7 @@
                                             {% else %}
                                                 <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
                                             {% endif %}
-                                            {% if item.score is not none %}
+                                            {% if item.score is not none and item.subreddit %}
                                                 <span class="score">Score: {{ item.score }}</span>
                                             {% endif %}
                                         </li>
