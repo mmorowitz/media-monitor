@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from src.db import init_db, get_last_checked, update_last_checked
 from src.reddit_client import RedditClient
 from src.youtube_client import YouTubeClient
+from src.bluesky_client import BlueskyClient
 import smtplib
 from email.message import EmailMessage
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -108,6 +109,13 @@ def validate_config(config):
         if not youtube_config.get('channels') and not youtube_config.get('categories'):
             raise ValueError("YouTube configuration must specify either 'channels' or 'categories'")
     
+    # Validate Bluesky configuration if enabled
+    bluesky_config = config.get('bluesky', {})
+    if bluesky_config.get('enabled', False):
+        # Validate Bluesky has either users or categories
+        if not bluesky_config.get('users') and not bluesky_config.get('categories'):
+            raise ValueError("Bluesky configuration must specify either 'users' or 'categories'")
+    
     # Validate SMTP configuration if enabled
     smtp_config = config.get('smtp', {})
     if smtp_config.get('enabled', False):
@@ -196,10 +204,10 @@ def group_items_by_category_and_source(items):
         return {'uncategorized': group_by_source(items)}
 
 def group_by_source(items):
-    """Group items by their source (subreddit or channel_id)."""
+    """Group items by their source (subreddit, channel_name, or author)."""
     grouped = {}
     for item in items:
-        source = item.get('subreddit') or item.get('channel_name', 'unknown')
+        source = item.get('subreddit') or item.get('channel_name') or item.get('author', 'unknown')
         if source not in grouped:
             grouped[source] = []
         grouped[source].append(item)
@@ -328,6 +336,7 @@ def main():
     all_items = {}
     all_items["reddit"] = process_source("reddit", RedditClient, config)
     all_items["youtube"] = process_source("youtube", YouTubeClient, config)
+    all_items["bluesky"] = process_source("bluesky", BlueskyClient, config)
 
     smtp_cfg = load_smtp_settings(config)
     if smtp_cfg:
