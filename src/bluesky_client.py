@@ -1,6 +1,6 @@
 import requests
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from .base_client import BaseMediaClient
 import json
 

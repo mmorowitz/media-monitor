@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from main import main, load_config, process_source, send_email, load_smtp_settings
 from src.reddit_client import RedditClient
 from src.youtube_client import YouTubeClient
+from src.bluesky_client import BlueskyClient
 from src.db import init_db, get_last_checked_with_conn as get_last_checked, update_last_checked_with_conn as update_last_checked
 
 
@@ -23,11 +24,12 @@ class TestFullIntegration:
     2. Fill in real API credentials:
        - Reddit: client_id, client_secret, user_agent
        - YouTube: api_key
+       - Bluesky: real usernames to monitor (no API key needed)
        - SMTP: server, username, password, from, to emails
     3. Set environment variable: INTEGRATION_TEST_CONFIG=config/integration_test_real.yaml
 
     These tests will:
-    - Make real API calls to Reddit and YouTube
+    - Make real API calls to Reddit, YouTube, and Bluesky
     - Send actual email notifications
     - Use a temporary database for isolation
 
@@ -87,6 +89,12 @@ class TestFullIntegration:
             youtube_cfg = config['youtube']
             if not youtube_cfg.get('api_key') or youtube_cfg['api_key'].startswith('YOUR_'):
                 pytest.skip(f"YouTube API key not configured in {config_file}")
+
+        if config.get('bluesky', {}).get('enabled'):
+            bluesky_cfg = config['bluesky']
+            # Bluesky doesn't need API keys, just validate users are configured
+            if not bluesky_cfg.get('users') and not bluesky_cfg.get('categories'):
+                pytest.skip(f"Bluesky users not configured in {config_file}")
 
         if config.get('smtp', {}).get('enabled'):
             smtp_cfg = config['smtp']
@@ -149,16 +157,62 @@ class TestFullIntegration:
         # Verify structure of returned items
         if items:
             item = items[0]
-            required_fields = ['id', 'title', 'url', 'published_at', 'channel_id']
+            required_fields = ['id', 'title', 'url', 'published_at', 'channel_id', 'channel_name']
             for field in required_fields:
                 assert field in item, f"Missing field {field} in YouTube item"
 
             print(f"Sample item: {item['title'][:50]}...")
-            print(f"Channel: {item['channel_id']}")
+            print(f"Channel ID: {item['channel_id']}")
+            print(f"Channel Name: {item['channel_name']}")
 
-            # Verify channel_id contains a human-readable name, not just an ID
+            # Verify channel_id is the raw YouTube ID and channel_name is human-readable
             channel_id = item['channel_id']
-            assert not channel_id.startswith('UC'), f"Channel ID should be human-readable name, got: {channel_id}"
+            channel_name = item['channel_name']
+            assert channel_id.startswith('UC'), f"Channel ID should be YouTube ID starting with UC, got: {channel_id}"
+            assert channel_name != channel_id, f"Channel name should be human-readable, not ID: {channel_name}"
+
+            # Test with categories if configured
+            if 'category' in item:
+                print(f"Item category: {item['category']}")
+
+        assert isinstance(items, list)
+
+    def test_bluesky_client_real_api(self, integration_config):
+        """Test Bluesky client with real API calls."""
+        if not integration_config.get('bluesky', {}).get('enabled'):
+            pytest.skip("Bluesky not enabled in integration config")
+
+        print("\n=== Testing Bluesky Client with Real API ===")
+
+        # Test that we can create a client and fetch data
+        bluesky_client = BlueskyClient(integration_config['bluesky'])
+
+        # Set a recent timestamp to get some recent posts
+        since_time = datetime.now(timezone.utc) - timedelta(hours=24)
+
+        items = bluesky_client.get_new_items_since(since_time)
+
+        print(f"Retrieved {len(items)} Bluesky items from the last 24 hours")
+
+        # Verify structure of returned items
+        if items:
+            item = items[0]
+            required_fields = ['id', 'title', 'url', 'author', 'created_utc', 'full_text']
+            for field in required_fields:
+                assert field in item, f"Missing field {field} in Bluesky item"
+
+            print(f"Sample item: {item['title'][:50]}...")
+            print(f"Author: {item['author']}")
+            print(f"URL: {item['url']}")
+
+            # Verify URL format is correct
+            assert item['url'].startswith('https://bsky.app/profile/'), f"Invalid Bluesky URL format: {item['url']}"
+
+            # Verify engagement metrics are present
+            engagement_fields = ['reply_count', 'repost_count', 'like_count']
+            for field in engagement_fields:
+                assert field in item, f"Missing engagement field {field} in Bluesky item"
+                assert isinstance(item[field], int), f"Engagement field {field} should be integer"
 
             # Test with categories if configured
             if 'category' in item:
@@ -231,6 +285,17 @@ class TestFullIntegration:
             assert last_checked is not None
             print(f"YouTube last checked updated to: {last_checked}")
 
+        # Test Bluesky if enabled
+        if integration_config.get('bluesky', {}).get('enabled'):
+            bluesky_items = process_source_with_db('bluesky', BlueskyClient, integration_config, temp_db)
+            print(f"Bluesky process_source returned {len(bluesky_items)} items")
+            assert isinstance(bluesky_items, list)
+
+            # Verify last checked was updated
+            last_checked = get_last_checked(temp_db, 'bluesky')
+            assert last_checked is not None
+            print(f"Bluesky last checked updated to: {last_checked}")
+
     def test_email_integration(self, integration_config):
         """Test sending actual email with real SMTP."""
         smtp_settings = load_smtp_settings(integration_config)
@@ -260,6 +325,20 @@ class TestFullIntegration:
                     'published_at': datetime.now(timezone.utc),
                     'category': 'test',
                     'channel_id': 'Test Channel'
+                }
+            ],
+            'bluesky': [
+                {
+                    'id': 'test_bluesky_1',
+                    'title': 'Integration Test Bluesky Post',
+                    'url': 'https://bsky.app/profile/test.bsky.social/post/test1',
+                    'author': 'test.bsky.social',
+                    'full_text': 'Integration Test Bluesky Post with more detailed content for testing email formatting',
+                    'created_utc': datetime.now(timezone.utc),
+                    'category': 'test',
+                    'reply_count': 3,
+                    'repost_count': 7,
+                    'like_count': 25
                 }
             ]
         }
@@ -291,7 +370,7 @@ class TestFullIntegration:
 
         print("Running full application with real APIs and email...")
         print("This will:")
-        print("1. Fetch real data from Reddit/YouTube APIs")
+        print("1. Fetch real data from Reddit/YouTube/Bluesky APIs")
         print("2. Update database with timestamps")
         print("3. Send actual email notification")
 
