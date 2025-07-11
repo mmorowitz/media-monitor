@@ -3,3 +3,4 @@ python-dotenv
 pyyaml
 google-api-python-client
 jinja2
+pytest
