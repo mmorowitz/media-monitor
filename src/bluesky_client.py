@@ -27,34 +27,34 @@ class BlueskyClient(BaseMediaClient):
     def _get_items_from_config(self, config):
         """Extract users list from config for simple format."""
         return config.get("users", [])
-    
+
     def _fetch_items_for_source(self, username, since_datetime):
         """Fetch posts from a specific Bluesky user."""
         posts = []
         try:
             # Format the since_datetime for the API
             since_iso = since_datetime.isoformat().replace("+00:00", "Z")
-            
+
             # Prepare API request parameters
             params = {
                 "q": f"from:{username}",
                 "limit": 50,
                 "since": since_iso
             }
-            
+
             # Make API request
             response = requests.get(self.base_url, params=params)
             response.raise_for_status()
-            
+
             # Parse JSON response
             data = response.json()
-            
+
             # Process each post
             for post in data.get("posts", []):
                 try:
                     # Extract post ID from URI
                     post_id = post["uri"].split("/")[-1]
-                    
+
                     # Parse creation time
                     created_at_str = post["record"]["createdAt"]
                     # Handle both .000Z and .123Z formats
@@ -62,19 +62,19 @@ class BlueskyClient(BaseMediaClient):
                         created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
                     else:
                         created_at = datetime.fromisoformat(created_at_str)
-                    
+
                     # Filter posts by time (API filtering might not be perfect)
                     # Debug: print dates for troubleshooting
                     # print(f"Post created: {created_at}, Since: {since_datetime}, Include: {created_at > since_datetime}")
                     if created_at > since_datetime:
                         # Get post text
                         full_text = post["record"]["text"]
-                        
+
                         # Create title (truncate if too long)
                         title = full_text
                         if len(title) > 100:
                             title = title[:100] + "..."
-                        
+
                         # Build post data
                         post_data = {
                             "id": post_id,
@@ -92,7 +92,7 @@ class BlueskyClient(BaseMediaClient):
                     # Handle malformed posts gracefully
                     logging.warning(f"Skipping malformed post for user '{username}': {e}")
                     continue
-                    
+
         except requests.exceptions.HTTPError as e:
             logging.error(f"HTTP error fetching posts for user '{username}': {e}")
         except requests.exceptions.RequestException as e:
@@ -101,5 +101,5 @@ class BlueskyClient(BaseMediaClient):
             logging.error(f"JSON decode error fetching posts for user '{username}': {e}")
         except Exception as e:
             logging.error(f"Unexpected error fetching posts for user '{username}': {e}")
-        
+
         return posts

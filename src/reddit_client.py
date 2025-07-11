@@ -35,7 +35,7 @@ class RedditClient(BaseMediaClient):
     def _get_items_from_config(self, config):
         """Extract subreddits list from config for simple format."""
         return config.get("subreddits", [])
-    
+
     def _fetch_items_for_source(self, subreddit, since_datetime):
         """Fetch posts from a specific subreddit."""
         posts = []
@@ -44,7 +44,7 @@ class RedditClient(BaseMediaClient):
                 created_utc = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
                 if created_utc > since_datetime:
                     reddit_url = f"https://reddit.com{submission.permalink}"
-                    
+
                     # Determine post type and URLs
                     if submission.is_self:
                         # Self post - discussion only happens on Reddit
@@ -56,7 +56,7 @@ class RedditClient(BaseMediaClient):
                         post_type = "link"
                         external_url = submission.url
                         primary_url = submission.url
-                    
+
                     post_data = {
                         "id": submission.id,
                         "title": submission.title,
@@ -74,5 +74,5 @@ class RedditClient(BaseMediaClient):
             logging.error(f"Reddit API error for subreddit '{subreddit}': {e}")
         except Exception as e:
             logging.error(f"Unexpected error fetching from subreddit '{subreddit}': {e}")
-        
+
         return posts

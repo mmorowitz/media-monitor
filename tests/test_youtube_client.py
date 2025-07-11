@@ -22,9 +22,9 @@ class TestYouTubeClient:
     def test_init_simple_config(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         client = YouTubeClient(self.config)
-        
+
         assert client.api_key == "test_api_key"
         assert client.channels == ["UC123", "UC456"]
         assert client.channel_names_cache == {}
@@ -34,9 +34,9 @@ class TestYouTubeClient:
     def test_init_categorized_config(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         client = YouTubeClient(self.categorized_config)
-        
+
         assert client.api_key == "test_api_key"
         assert set(client.channels) == {"UC123", "UC456"}
         assert client.categories == {"tech": ["UC123"], "education": ["UC456"]}
@@ -45,12 +45,12 @@ class TestYouTubeClient:
     def test_get_channel_name_cache_hit(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         client = YouTubeClient(self.config)
         client.channel_names_cache["UC123"] = "TechChannel"
-        
+
         result = client._get_channel_name("UC123")
-        
+
         assert result == "TechChannel"
         # Should not make API call when cache hit
         mock_youtube.channels.assert_not_called()
@@ -59,7 +59,7 @@ class TestYouTubeClient:
     def test_get_channel_name_api_success(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock API response
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
@@ -73,10 +73,10 @@ class TestYouTubeClient:
                 }
             ]
         }
-        
+
         client = YouTubeClient(self.config)
         result = client._get_channel_name("UC123")
-        
+
         assert result == "TechChannel"
         assert client.channel_names_cache["UC123"] == "TechChannel"
         mock_youtube.channels.return_value.list.assert_called_once_with(
@@ -88,15 +88,15 @@ class TestYouTubeClient:
     def test_get_channel_name_api_failure(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock API failure
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
         mock_request.execute.side_effect = Exception("API Error")
-        
+
         client = YouTubeClient(self.config)
         result = client._get_channel_name("UC123")
-        
+
         # Should fallback to channel ID
         assert result == "UC123"
         assert client.channel_names_cache["UC123"] == "UC123"
@@ -105,15 +105,15 @@ class TestYouTubeClient:
     def test_get_channel_name_no_items(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock API response with no items
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
         mock_request.execute.return_value = {"items": []}
-        
+
         client = YouTubeClient(self.config)
         result = client._get_channel_name("UC123")
-        
+
         # Should fallback to channel ID
         assert result == "UC123"
         assert client.channel_names_cache["UC123"] == "UC123"
@@ -122,7 +122,7 @@ class TestYouTubeClient:
     def test_fetch_items_for_source_with_channel_names(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock channel name lookup
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
@@ -136,7 +136,7 @@ class TestYouTubeClient:
                 }
             ]
         }
-        
+
         # Mock search API response
         search_request = Mock()
         mock_youtube.search.return_value.list.return_value = search_request
@@ -151,12 +151,12 @@ class TestYouTubeClient:
                 }
             ]
         }
-        
+
         client = YouTubeClient(self.config)
         since_datetime = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        
+
         result = client._fetch_items_for_source("UC123", since_datetime)
-        
+
         assert len(result) == 1
         video = result[0]
         assert video["id"] == "video123"
@@ -165,7 +165,7 @@ class TestYouTubeClient:
         assert video["channel_id"] == "UC123"  # Should use actual channel ID
         assert video["channel_name"] == "TechChannel"  # Should use channel name for display
         assert isinstance(video["published_at"], datetime)
-        
+
         # Verify channel name was fetched
         mock_youtube.channels.return_value.list.assert_called_once_with(
             part="snippet",
@@ -176,14 +176,14 @@ class TestYouTubeClient:
     def test_fetch_items_filters_by_datetime(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock channel name lookup
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
         mock_request.execute.return_value = {
             "items": [{"snippet": {"title": "TechChannel"}}]
         }
-        
+
         # Mock search API response with videos before and after the since_datetime
         search_request = Mock()
         mock_youtube.search.return_value.list.return_value = search_request
@@ -205,12 +205,12 @@ class TestYouTubeClient:
                 }
             ]
         }
-        
+
         client = YouTubeClient(self.config)
         since_datetime = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        
+
         result = client._fetch_items_for_source("UC123", since_datetime)
-        
+
         # Should only return the video after since_datetime
         assert len(result) == 1
         assert result[0]["id"] == "new_video"
@@ -220,7 +220,7 @@ class TestYouTubeClient:
     def test_get_new_items_since_with_categories(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock channel name lookup for both channels (now supports batch calls)
         def mock_channel_response(**kwargs):
             channel_ids = kwargs.get('id', '')
@@ -241,9 +241,9 @@ class TestYouTubeClient:
                 elif channel_ids == "UC456":
                     return Mock(execute=lambda: {"items": [{"id": "UC456", "snippet": {"title": "EduChannel"}}]})
             return Mock(execute=lambda: {"items": []})
-        
+
         mock_youtube.channels.return_value.list.side_effect = mock_channel_response
-        
+
         # Mock search API responses
         def mock_search_response(**kwargs):
             channelId = kwargs.get('channelId')
@@ -268,24 +268,24 @@ class TestYouTubeClient:
                     }]
                 })
             return Mock(execute=lambda: {"items": []})
-        
+
         mock_youtube.search.return_value.list.side_effect = mock_search_response
-        
+
         client = YouTubeClient(self.categorized_config)
         since_datetime = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        
+
         result = client.get_new_items_since(since_datetime)
-        
+
         assert len(result) == 2
-        
+
         # Find items by ID
         tech_item = next(item for item in result if item["id"] == "tech_video")
         edu_item = next(item for item in result if item["id"] == "edu_video")
-        
+
         # Verify categories are assigned
         assert tech_item["category"] == "tech"
         assert edu_item["category"] == "education"
-        
+
         # Verify channel IDs and names are used correctly
         assert tech_item["channel_id"] == "UC123"
         assert tech_item["channel_name"] == "TechChannel"
@@ -296,24 +296,24 @@ class TestYouTubeClient:
     def test_channel_name_caching_across_calls(self, mock_build):
         mock_youtube = Mock()
         mock_build.return_value = mock_youtube
-        
+
         # Mock channel name lookup - should only be called once due to caching
         mock_request = Mock()
         mock_youtube.channels.return_value.list.return_value = mock_request
         mock_request.execute.return_value = {
             "items": [{"id": "UC123", "snippet": {"title": "TechChannel"}}]
         }
-        
+
         client = YouTubeClient(self.config)
-        
+
         # Call _get_channel_name multiple times
         name1 = client._get_channel_name("UC123")
         name2 = client._get_channel_name("UC123")
         name3 = client._get_channel_name("UC123")
-        
+
         assert name1 == "TechChannel"
         assert name2 == "TechChannel"
         assert name3 == "TechChannel"
-        
+
         # API should only be called once due to caching
         mock_youtube.channels.return_value.list.assert_called_once()

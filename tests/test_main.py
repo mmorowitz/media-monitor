@@ -23,13 +23,13 @@ class TestLoadConfig:
             }
         }
         mock_yaml_load.return_value = mock_config
-        
+
         result = load_config('config/test.yaml')
-        
+
         mock_file.assert_called_once_with('config/test.yaml', 'r')
         mock_yaml_load.assert_called_once()
         assert result == mock_config
-    
+
     def test_load_config_default_filename(self):
         with patch('builtins.open', mock_open(read_data='test: data')) as mock_file:
             with patch('yaml.safe_load', return_value={'test': 'data'}):
@@ -41,90 +41,90 @@ class TestLoadConfig:
 class TestEnvironmentOverrides:
     def test_apply_env_overrides_reddit_config(self):
         config = {'reddit': {'enabled': False, 'client_id': 'original_id'}}
-        
+
         with patch.dict('os.environ', {
             'MEDIA_MONITOR_REDDIT_CLIENT_ID': 'new_id',
             'MEDIA_MONITOR_REDDIT_ENABLED': 'true',
             'MEDIA_MONITOR_REDDIT_CLIENT_SECRET': 'secret123'
         }):
             _apply_env_overrides(config)
-        
+
         assert config['reddit']['client_id'] == 'new_id'
         assert config['reddit']['enabled'] is True
         assert config['reddit']['client_secret'] == 'secret123'
-    
+
     def test_apply_env_overrides_smtp_config(self):
         config = {'smtp': {'port': 25}}
-        
+
         with patch.dict('os.environ', {
             'MEDIA_MONITOR_SMTP_PORT': '587',
             'MEDIA_MONITOR_SMTP_PASSWORD': 'mypass',
             'MEDIA_MONITOR_SMTP_TO': 'user1@example.com, user2@example.com'
         }):
             _apply_env_overrides(config)
-        
+
         assert config['smtp']['port'] == 587
         assert config['smtp']['password'] == 'mypass'
         assert config['smtp']['to'] == ['user1@example.com', 'user2@example.com']
-    
+
     def test_apply_env_overrides_youtube_config(self):
         config = {}
-        
+
         with patch.dict('os.environ', {
             'MEDIA_MONITOR_YOUTUBE_API_KEY': 'youtube_key_123',
             'MEDIA_MONITOR_YOUTUBE_ENABLED': '1'
         }):
             _apply_env_overrides(config)
-        
+
         assert config['youtube']['api_key'] == 'youtube_key_123'
         assert config['youtube']['enabled'] is True
-    
+
     def test_apply_env_overrides_boolean_values(self):
         config = {}
-        
+
         with patch.dict('os.environ', {
             'MEDIA_MONITOR_REDDIT_ENABLED': 'false',
             'MEDIA_MONITOR_YOUTUBE_ENABLED': '0',
             'MEDIA_MONITOR_SMTP_ENABLED': 'no'
         }):
             _apply_env_overrides(config)
-        
+
         assert config['reddit']['enabled'] is False
         assert config['youtube']['enabled'] is False
         assert config['smtp']['enabled'] is False
-    
+
     def test_apply_env_overrides_invalid_port(self):
         config = {}
-        
+
         with patch.dict('os.environ', {'MEDIA_MONITOR_SMTP_PORT': 'invalid_port'}):
             with patch('main.logging') as mock_logging:
                 _apply_env_overrides(config)
                 mock_logging.warning.assert_called_once()
                 # Port should not be set due to invalid value
                 assert 'smtp' not in config or 'port' not in config.get('smtp', {})
-    
+
     def test_apply_env_overrides_ignores_non_matching_vars(self):
         config = {}
-        
+
         with patch.dict('os.environ', {
             'OTHER_VAR': 'value',
             'MEDIA_MONITOR_': 'incomplete',
             'MEDIA_MONITOR_INVALID': 'single_part'
         }):
             _apply_env_overrides(config)
-        
+
         # Config should remain empty
         assert config == {}
-    
+
     def test_apply_env_overrides_underscore_fields(self):
         config = {}
-        
+
         with patch.dict('os.environ', {
             'MEDIA_MONITOR_REDDIT_USER_AGENT': 'MyBot/1.0',
             'MEDIA_MONITOR_REDDIT_CLIENT_SECRET': 'secret'
         }):
             _apply_env_overrides(config)
-        
+
         assert config['reddit']['user_agent'] == 'MyBot/1.0'
         assert config['reddit']['client_secret'] == 'secret'
 
@@ -134,10 +134,10 @@ class TestEnvironmentOverrides:
     def test_load_config_applies_env_overrides(self, mock_yaml_load, mock_file, mock_apply_env):
         mock_config = {'reddit': {'enabled': True}}
         mock_yaml_load.return_value = mock_config
-        
+
         with patch('main.validate_config'):
             load_config('test.yaml')
-        
+
         mock_apply_env.assert_called_once_with(mock_config)
 
 
@@ -154,7 +154,7 @@ class TestValidateConfig:
         }
         # Should not raise an exception
         validate_config(config)
-    
+
     def test_validate_config_missing_reddit_field(self):
         config = {
             'reddit': {
@@ -167,7 +167,7 @@ class TestValidateConfig:
         }
         with pytest.raises(ValueError, match="Reddit configuration missing required field: client_secret"):
             validate_config(config)
-    
+
     def test_validate_config_valid_youtube(self):
         config = {
             'youtube': {
@@ -178,7 +178,7 @@ class TestValidateConfig:
         }
         # Should not raise an exception
         validate_config(config)
-    
+
     def test_validate_config_missing_youtube_sources(self):
         config = {
             'youtube': {
@@ -189,7 +189,7 @@ class TestValidateConfig:
         }
         with pytest.raises(ValueError, match="YouTube configuration must specify either 'channels' or 'categories'"):
             validate_config(config)
-    
+
     def test_validate_config_valid_smtp(self):
         config = {
             'smtp': {
@@ -204,7 +204,7 @@ class TestValidateConfig:
         }
         # Should not raise an exception
         validate_config(config)
-    
+
     def test_validate_config_invalid_smtp_port(self):
         config = {
             'smtp': {
@@ -219,7 +219,7 @@ class TestValidateConfig:
         }
         with pytest.raises(ValueError, match="SMTP port must be a valid integer"):
             validate_config(config)
-    
+
     def test_validate_config_disabled_services(self):
         config = {
             'reddit': {'enabled': False},
@@ -233,17 +233,17 @@ class TestValidateConfig:
 class TestFormatEmailContent:
     def test_format_email_content_no_items(self):
         all_items = {}
-        
+
         plain_text, html_content = format_email_content(all_items)
-        
+
         # Check that both formats are returned
         assert isinstance(plain_text, str)
         assert isinstance(html_content, str)
-        
+
         # Check content indicates no items
         assert "No new items" in plain_text
         assert "No new items" in html_content or "No New Content" in html_content
-    
+
     def test_format_email_content_with_items(self):
         all_items = {
             'reddit': [
@@ -264,30 +264,30 @@ class TestFormatEmailContent:
                 }
             ]
         }
-        
+
         plain_text, html_content = format_email_content(all_items)
-        
+
         # Check that both formats are returned
         assert isinstance(plain_text, str)
         assert isinstance(html_content, str)
-        
+
         # Check content includes items
         assert 'Test Reddit Post' in plain_text
         assert 'Test YouTube Video' in plain_text
         assert 'python' in plain_text
         assert 'TechChannel' in plain_text
-        
+
         assert 'Test Reddit Post' in html_content
         assert 'Test YouTube Video' in html_content
         assert 'python' in html_content
         assert 'TechChannel' in html_content
-        
+
         # Check HTML contains proper tags
         assert '<html' in html_content
         assert '</html>' in html_content
         assert '<a href="https://reddit.com/test1"' in html_content
         assert '<a href="https://youtube.com/test2"' in html_content
-    
+
     def test_format_email_content_with_categories(self):
         all_items = {
             'reddit': [
@@ -309,39 +309,39 @@ class TestFormatEmailContent:
                 }
             ]
         }
-        
+
         plain_text, html_content = format_email_content(all_items)
-        
+
         # Check categories are shown
         assert 'News' in plain_text or 'NEWS' in plain_text
         assert 'Tech' in plain_text or 'TECH' in plain_text
         assert 'worldnews' in plain_text
         assert 'technology' in plain_text
-        
+
         # Check scores are displayed
         assert 'Score: 156' in plain_text
         assert 'Score: 89' in plain_text
-        
+
         # Check HTML formatting
         assert 'Breaking News' in html_content
         assert 'Tech Update' in html_content
         assert 'Score: 156' in html_content
         assert 'Score: 89' in html_content
-    
+
     def test_format_email_content_empty_service_lists(self):
         all_items = {
             'reddit': [],
             'youtube': []
         }
-        
+
         plain_text, html_content = format_email_content(all_items)
-        
+
         # Should handle empty lists gracefully
         assert isinstance(plain_text, str)
         assert isinstance(html_content, str)
         assert len(plain_text) > 0
         assert len(html_content) > 0
-    
+
     @patch('main.logging')
     def test_format_email_content_template_error_fallback(self, mock_logging):
         # Mock template loading to fail
@@ -349,17 +349,17 @@ class TestFormatEmailContent:
             mock_env = Mock()
             mock_env.get_template.side_effect = Exception("Template not found")
             mock_setup.return_value = mock_env
-            
+
             all_items = {'reddit': [{'title': 'test'}]}
-            
+
             plain_text, html_content = format_email_content(all_items)
-            
+
             # Should fall back to simple content
             assert isinstance(plain_text, str)
             assert isinstance(html_content, str)
             assert 'New items found' in plain_text
             assert '<p>' in html_content
-            
+
             # Should log the error
             mock_logging.error.assert_called_once()
 
@@ -374,23 +374,23 @@ class TestProcessSource:
         self.mock_client_class = Mock()
         self.mock_client = Mock()
         self.mock_client_class.return_value = self.mock_client
-        
+
     def test_process_source_disabled(self):
         config = {'reddit': {'enabled': False}}
-        
+
         result = process_source('reddit', self.mock_client_class, config)
-        
+
         assert result == []
         self.mock_client_class.assert_not_called()
-    
+
     def test_process_source_missing_config(self):
         config = {}
-        
+
         result = process_source('reddit', self.mock_client_class, config)
-        
+
         assert result == []
         self.mock_client_class.assert_not_called()
-    
+
     @patch('main.get_last_checked')
     @patch('main.update_last_checked')
     @patch('main.datetime')
@@ -398,42 +398,42 @@ class TestProcessSource:
         config = {'reddit': {'enabled': True, 'subreddits': ['test']}}
         last_checked_str = '2024-01-01T12:00:00+00:00'
         mock_get.return_value = last_checked_str
-        
+
         mock_items = [
             {'id': '1', 'title': 'Test Post 1', 'url': 'https://example.com/1'},
             {'id': '2', 'title': 'Test Post 2', 'url': 'https://example.com/2'}
         ]
         self.mock_client.get_new_items_since.return_value = mock_items
-        
+
         current_time = datetime.now(timezone.utc)
         mock_datetime.now.return_value = current_time
         mock_datetime.fromisoformat = datetime.fromisoformat
-        
+
         result = process_source('reddit', self.mock_client_class, config)
-        
+
         assert result == mock_items
         self.mock_client_class.assert_called_once_with(config['reddit'])
         mock_get.assert_called_once_with('reddit')
         self.mock_client.get_new_items_since.assert_called_once()
         mock_update.assert_called_once_with('reddit', current_time)
-    
+
     @patch('main.get_last_checked')
     @patch('main.update_last_checked')
     @patch('main.datetime')
     def test_process_source_no_previous_check(self, mock_datetime, mock_update, mock_get):
         config = {'youtube': {'enabled': True, 'channels': ['test_channel']}}
         mock_get.return_value = None
-        
+
         mock_items = []
         self.mock_client.get_new_items_since.return_value = mock_items
-        
+
         current_time = datetime.now(timezone.utc)
         default_time = current_time - timedelta(hours=72)
         mock_datetime.now.return_value = current_time
         mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs) if args else current_time
-        
+
         result = process_source('youtube', self.mock_client_class, config)
-        
+
         assert result == mock_items
         self.mock_client_class.assert_called_once_with(config['youtube'])
         mock_get.assert_called_once_with('youtube')
@@ -450,11 +450,11 @@ class TestLoadSmtpSettings:
                 'port': 587
             }
         }
-        
+
         result = load_smtp_settings(config)
-        
+
         assert result == config['smtp']
-    
+
     def test_smtp_disabled(self):
         config = {
             'smtp': {
@@ -462,27 +462,27 @@ class TestLoadSmtpSettings:
                 'server': 'smtp.example.com'
             }
         }
-        
+
         result = load_smtp_settings(config)
-        
+
         assert result is None
-    
+
     def test_smtp_missing(self):
         config = {}
-        
+
         result = load_smtp_settings(config)
-        
+
         assert result is None
-    
+
     def test_smtp_enabled_missing(self):
         config = {
             'smtp': {
                 'server': 'smtp.example.com'
             }
         }
-        
+
         result = load_smtp_settings(config)
-        
+
         assert result is None
 
 
@@ -496,30 +496,30 @@ class TestSendEmail:
             'from': 'test@example.com',
             'to': ['recipient@example.com']
         }
-    
+
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_no_items(self, mock_smtp):
         mock_server = Mock()
         mock_smtp.return_value.__enter__.return_value = mock_server
-        
+
         all_items = {}
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         mock_smtp.assert_called_once_with('smtp.example.com', 587)
         mock_server.login.assert_called_once_with('test@example.com', 'password')
         mock_server.send_message.assert_called_once()
-        
+
         # Check that the message contains "No new items" content
         call_args = mock_server.send_message.call_args[0][0]
         message_str = str(call_args)
         assert "No new items" in message_str or "No New Content" in message_str
-    
+
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_with_items(self, mock_smtp):
         mock_server = Mock()
         mock_smtp.return_value.__enter__.return_value = mock_server
-        
+
         all_items = {
             'reddit': [
                 {'id': '1', 'title': 'Test Post', 'url': 'https://reddit.com/1', 'subreddit': 'python'}
@@ -528,13 +528,13 @@ class TestSendEmail:
                 {'id': '2', 'title': 'Test Video', 'url': 'https://youtube.com/2', 'channel_id': 'TechChannel'}
             ]
         }
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         mock_smtp.assert_called_once_with('smtp.example.com', 587)
         mock_server.login.assert_called_once_with('test@example.com', 'password')
         mock_server.send_message.assert_called_once()
-        
+
         # Check that message contains the items and sources
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
@@ -542,39 +542,39 @@ class TestSendEmail:
         assert 'Test Video' in message_content
         assert 'python' in message_content
         assert 'TechChannel' in message_content
-    
+
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
     @patch('main.time.sleep')  # Mock sleep to speed up test
     def test_send_email_smtp_error(self, mock_sleep, mock_logging, mock_smtp):
         mock_smtp.side_effect = Exception('SMTP connection failed')
-        
+
         all_items = {}
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         # Verify retry logic was triggered (should have 2 warning calls + 1 error call)
         assert mock_logging.warning.call_count == 2
         mock_logging.error.assert_called_once_with('Failed to send email after 3 attempts with unexpected error: SMTP connection failed')
-        
+
         # Verify exponential backoff delays
         mock_sleep.assert_any_call(1.0)  # First retry: 1 second
         mock_sleep.assert_any_call(2.0)  # Second retry: 2 seconds
-    
+
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
     def test_send_email_authentication_error_no_retry(self, mock_logging, mock_smtp):
         # Authentication errors should not be retried
         mock_smtp.side_effect = smtplib.SMTPAuthenticationError(535, 'Authentication failed')
-        
+
         all_items = {}
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         # Should not retry authentication errors
         mock_logging.warning.assert_not_called()
         mock_logging.error.assert_called_once_with('SMTP Authentication failed: (535, \'Authentication failed\')')
-    
+
     @patch('main.smtplib.SMTP_SSL')
     @patch('main.logging')
     @patch('main.time.sleep')
@@ -584,7 +584,7 @@ class TestSendEmail:
             if not hasattr(side_effect, 'call_count'):
                 side_effect.call_count = 0
             side_effect.call_count += 1
-            
+
             if side_effect.call_count == 1:
                 raise smtplib.SMTPConnectError(421, 'Connection failed')
             else:
@@ -593,30 +593,30 @@ class TestSendEmail:
                 mock_server.__enter__ = Mock(return_value=mock_server)
                 mock_server.__exit__ = Mock(return_value=None)
                 return mock_server
-        
+
         mock_smtp.side_effect = side_effect
-        
+
         all_items = {}
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         # Should have 1 warning (first failure) and 1 success info
         mock_logging.warning.assert_called_once()
         mock_logging.info.assert_called_with('Email sent successfully.')
         mock_sleep.assert_called_once_with(1.0)  # First retry delay
-    
+
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_empty_items_list(self, mock_smtp):
         mock_server = Mock()
         mock_smtp.return_value.__enter__.return_value = mock_server
-        
+
         all_items = {
             'reddit': [],
             'youtube': []
         }
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         mock_server.send_message.assert_called_once()
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
@@ -631,9 +631,9 @@ class TestGroupBySource:
             {'id': '2', 'title': 'Test 2', 'subreddit': 'python'},
             {'id': '3', 'title': 'Test 3', 'subreddit': 'programming'}
         ]
-        
+
         result = group_by_source(items)
-        
+
         expected = {
             'python': [
                 {'id': '1', 'title': 'Test 1', 'subreddit': 'python'},
@@ -644,28 +644,28 @@ class TestGroupBySource:
             ]
         }
         assert result == expected
-    
+
     def test_group_by_source_youtube(self):
         items = [
             {'id': '1', 'title': 'Video 1', 'channel_id': 'UC123', 'channel_name': 'TechChannel'},
             {'id': '2', 'title': 'Video 2', 'channel_id': 'UC456', 'channel_name': 'EduChannel'}
         ]
-        
+
         result = group_by_source(items)
-        
+
         expected = {
             'TechChannel': [{'id': '1', 'title': 'Video 1', 'channel_id': 'UC123', 'channel_name': 'TechChannel'}],
             'EduChannel': [{'id': '2', 'title': 'Video 2', 'channel_id': 'UC456', 'channel_name': 'EduChannel'}]
         }
         assert result == expected
-    
+
     def test_group_by_source_unknown(self):
         items = [
             {'id': '1', 'title': 'Test Item'}
         ]
-        
+
         result = group_by_source(items)
-        
+
         expected = {
             'unknown': [{'id': '1', 'title': 'Test Item'}]
         }
@@ -678,9 +678,9 @@ class TestGroupItemsByCategoryAndSource:
             {'id': '1', 'title': 'Test 1', 'subreddit': 'python'},
             {'id': '2', 'title': 'Test 2', 'subreddit': 'programming'}
         ]
-        
+
         result = group_items_by_category_and_source(items)
-        
+
         expected = {
             'uncategorized': {
                 'python': [{'id': '1', 'title': 'Test 1', 'subreddit': 'python'}],
@@ -688,16 +688,16 @@ class TestGroupItemsByCategoryAndSource:
             }
         }
         assert result == expected
-    
+
     def test_group_items_with_categories(self):
         items = [
             {'id': '1', 'title': 'News Item', 'category': 'news', 'subreddit': 'worldnews'},
             {'id': '2', 'title': 'Tech Item', 'category': 'tech', 'subreddit': 'python'},
             {'id': '3', 'title': 'Another News', 'category': 'news', 'subreddit': 'politics'}
         ]
-        
+
         result = group_items_by_category_and_source(items)
-        
+
         expected = {
             'news': {
                 'worldnews': [{'id': '1', 'title': 'News Item', 'category': 'news', 'subreddit': 'worldnews'}],
@@ -708,15 +708,15 @@ class TestGroupItemsByCategoryAndSource:
             }
         }
         assert result == expected
-    
+
     def test_group_items_mixed_categorization(self):
         items = [
             {'id': '1', 'title': 'Categorized', 'category': 'news', 'subreddit': 'worldnews'},
             {'id': '2', 'title': 'Uncategorized', 'subreddit': 'python'}
         ]
-        
+
         result = group_items_by_category_and_source(items)
-        
+
         expected = {
             'news': {
                 'worldnews': [{'id': '1', 'title': 'Categorized', 'category': 'news', 'subreddit': 'worldnews'}]
@@ -726,7 +726,7 @@ class TestGroupItemsByCategoryAndSource:
             }
         }
         assert result == expected
-    
+
     def test_group_items_empty_list(self):
         result = group_items_by_category_and_source([])
         assert result == {}
@@ -742,12 +742,12 @@ class TestSendEmailWithCategories:
             'from': 'test@example.com',
             'to': ['recipient@example.com']
         }
-    
+
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_with_categorized_items(self, mock_smtp):
         mock_server = Mock()
         mock_smtp.return_value.__enter__.return_value = mock_server
-        
+
         all_items = {
             'reddit': [
                 {'id': '1', 'title': 'News Post', 'url': 'https://reddit.com/1', 'category': 'news', 'subreddit': 'worldnews'},
@@ -755,13 +755,13 @@ class TestSendEmailWithCategories:
                 {'id': '3', 'title': 'Another News', 'url': 'https://reddit.com/3', 'category': 'news', 'subreddit': 'politics'}
             ]
         }
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         mock_smtp.assert_called_once_with('smtp.example.com', 587)
         mock_server.login.assert_called_once_with('test@example.com', 'password')
         mock_server.send_message.assert_called_once()
-        
+
         # Check that message contains category and source groupings
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
@@ -772,12 +772,12 @@ class TestSendEmailWithCategories:
         assert 'politics' in message_content
         assert 'News Post' in message_content
         assert 'Tech Post' in message_content
-    
+
     @patch('main.smtplib.SMTP_SSL')
     def test_send_email_mixed_sources_with_categories(self, mock_smtp):
         mock_server = Mock()
         mock_smtp.return_value.__enter__.return_value = mock_server
-        
+
         all_items = {
             'reddit': [
                 {'id': '1', 'title': 'Reddit News', 'url': 'https://reddit.com/1', 'category': 'news', 'subreddit': 'worldnews'}
@@ -787,9 +787,9 @@ class TestSendEmailWithCategories:
                 {'id': '3', 'title': 'Uncategorized Video', 'url': 'https://youtube.com/3', 'channel_id': 'EduChannel'}
             ]
         }
-        
+
         send_email(self.smtp_cfg, all_items)
-        
+
         call_args = mock_server.send_message.call_args[0][0]
         message_content = str(call_args)
         # Template uses uppercase service names in text format

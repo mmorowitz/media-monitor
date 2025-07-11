@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime, timezone, timedelta
 import json
@@ -535,3 +534,4 @@ class TestBlueskyClient:
         assert len(posts) == 1
         assert isinstance(posts[0]["created_utc"], datetime)
         assert posts[0]["created_utc"].tzinfo == timezone.utc
+
