@@ -21,7 +21,7 @@ class BlueskyClient(BaseMediaClient):
         }
         """
         super().__init__(config)
-        self.base_url = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
+        self.base_url = "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed"
         self.users = self.items
 
     def _get_items_from_config(self, config):
@@ -37,9 +37,8 @@ class BlueskyClient(BaseMediaClient):
 
             # Prepare API request parameters
             params = {
-                "q": f"from:{username}",
-                "limit": 50,
-                "since": since_iso
+                "actor": username,
+                "limit": 50
             }
 
             # Make API request
@@ -49,8 +48,9 @@ class BlueskyClient(BaseMediaClient):
             # Parse JSON response
             data = response.json()
 
-            # Process each post
-            for post in data.get("posts", []):
+            # Process each post from the feed
+            for feed_item in data.get("feed", []):
+                post = feed_item.get("post", {})
                 try:
                     # Extract post ID from URI
                     post_id = post["uri"].split("/")[-1]
