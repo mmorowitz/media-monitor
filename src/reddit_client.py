@@ -1,7 +1,10 @@
-import praw
 import logging
 from datetime import datetime, timezone
+
+import praw
+
 from .base_client import BaseMediaClient
+
 
 class RedditClient(BaseMediaClient):
     def __init__(self, config):
@@ -23,14 +26,23 @@ class RedditClient(BaseMediaClient):
                 "tech": ["python", "learnprogramming"]
             }
         }
+        Optional karma filtering:
+        {
+            ...,
+            "karma_filters": {
+                "chicago": 50,  # Only include posts with 50+ karma
+                "worldnews": 100
+            }
+        }
         """
         super().__init__(config)
         self.reddit = praw.Reddit(
             client_id=config["client_id"],
             client_secret=config["client_secret"],
-            user_agent=config["user_agent"]
+            user_agent=config["user_agent"],
         )
         self.subreddits = self.items
+        self.karma_filters = config.get("karma_filters", {})
 
     def _get_items_from_config(self, config):
         """Extract subreddits list from config for simple format."""
@@ -39,10 +51,18 @@ class RedditClient(BaseMediaClient):
     def _fetch_items_for_source(self, subreddit, since_datetime):
         """Fetch posts from a specific subreddit."""
         posts = []
+        min_karma = self.karma_filters.get(subreddit, 0)
+
         try:
             for submission in self.reddit.subreddit(subreddit).new(limit=100):
-                created_utc = datetime.fromtimestamp(submission.created_utc, tz=timezone.utc)
+                created_utc = datetime.fromtimestamp(
+                    submission.created_utc, tz=timezone.utc
+                )
                 if created_utc > since_datetime:
+                    # Apply karma filter
+                    if submission.score < min_karma:
+                        continue
+
                     reddit_url = f"https://reddit.com{submission.permalink}"
 
                     # Determine post type and URLs
@@ -67,12 +87,14 @@ class RedditClient(BaseMediaClient):
                         "created_utc": created_utc,
                         "permalink": reddit_url,  # Backward compatibility
                         "subreddit": subreddit,
-                        "score": submission.score
+                        "score": submission.score,
                     }
                     posts.append(post_data)
         except praw.exceptions.PRAWException as e:
             logging.error(f"Reddit API error for subreddit '{subreddit}': {e}")
         except Exception as e:
-            logging.error(f"Unexpected error fetching from subreddit '{subreddit}': {e}")
+            logging.error(
+                f"Unexpected error fetching from subreddit '{subreddit}': {e}"
+            )
 
         return posts

@@ -17,6 +17,11 @@ reddit:
     programming:
       - python
       - learnprogramming
+  # Option 3: Karma filtering (works with both simple and categorized formats)
+  # Set minimum karma thresholds for specific subreddits
+  karma_filters:
+    chicago: 50  # Only include posts with 50+ karma from r/chicago
+    worldnews: 100  # Only include posts with 100+ karma from r/worldnews
   client_id: YOUR_CLIENT_ID
   client_secret: YOUR_CLIENT_SECRET
   user_agent: YOUR_USER_AGENT
